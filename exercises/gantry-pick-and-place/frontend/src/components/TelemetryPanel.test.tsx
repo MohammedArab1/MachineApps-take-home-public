@@ -42,9 +42,9 @@ describe("TelemetryPanel", () => {
       "aria-valuenow",
       "50",
     );
-    expect(screen.getByTestId("telemetry-cube")).toHaveTextContent("X -750.0");
+    expect(screen.getByTestId("telemetry-cube")).toHaveTextContent("X -650.0");
     expect(screen.getByTestId("telemetry-destination")).toHaveTextContent(
-      "X 700.0",
+      "X 630.0",
     );
     expect(screen.getByTestId("telemetry-home")).toHaveTextContent("X 0.0");
   });

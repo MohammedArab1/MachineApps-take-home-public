@@ -122,15 +122,15 @@ The application uses a robot-centred Cartesian frame in millimetres:
 | +Z | Up |
 | Workspace | `x, y, z ∈ [-1000, 1000]` (the simulator's limits) |
 | Footprint | 2000 × 2000 mm |
-| Table A | `x ∈ [-1000, -500]`, `y ∈ [500, 1000]` |
-| Table B | `x ∈ [500, 1000]`, `y ∈ [-1000, -500]` |
+| Table A | 500 mm square, inset ~100 mm from the top/left: `x ∈ [-900, -400]`, `y ∈ [400, 900]` |
+| Table B | 500 mm square rotated 45°, centre `(630, -550)`; right corner near the right edge, bottom corner inset ~100 mm |
 
 Defaults:
 
 ```json
 {
-  "cubePosition":        { "x": -750, "y":  750, "z": 0 },
-  "destinationPosition": { "x":  700, "y": -700, "z": 0 },
+  "cubePosition":        { "x": -650, "y":  650, "z": 0 },
+  "destinationPosition": { "x":  630, "y": -550, "z": 0 },
   "homePosition":        { "x":    0, "y":    0, "z": 0 },
   "speed": 90,
   "approachHeight": 100
@@ -147,8 +147,9 @@ Validation rules:
   `robot_sim.move_to` divides by the planned motion time.
 - Approach height is 0 to 1000 mm.
 
-The figure's Table B is rotated 45°; the dashboard draws it axis-aligned for
-clarity. The configured coordinates are authoritative.
+The dashboard draws Table B as a 500 mm square rotated 45°, matching the
+figure: its right corner sits close to the right cell edge and its bottom
+corner is inset ~100 mm. The configured coordinates are authoritative.
 
 ---
 
@@ -414,8 +415,10 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 - This is a simulation: no real hardware, collision detection, inverse
   kinematics, or safety PLC.
 - The cube is represented by its pick point; its physical size is not modelled.
-- Table B's rotation in the figure is illustrative; the dashboard uses an
-  axis-aligned region. Configured coordinates are authoritative.
+- The table geometry is a visual reference. Motion targets come from the
+  configured cube and destination points, not from the table polygons, so the
+  table placement does not affect the control logic. The defaults are the
+  measured table centres.
 - One operator, one browser, one backend worker, no authentication.
 - The `SimulateFault` action is a demo aid. It is always in the proto but the
   backend refuses it when `GANTRY_ENABLE_DEV_TOOLS=false`; the frontend hides

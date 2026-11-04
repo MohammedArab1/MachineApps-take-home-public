@@ -12,8 +12,8 @@ function defaultAxis(): AxisValues {
 
 export function emptyConfigValues(): ConfigValues {
   return {
-    cube: { x: "-750", y: "750", z: "0" },
-    destination: { x: "700", y: "-700", z: "0" },
+    cube: { x: "-650", y: "650", z: "0" },
+    destination: { x: "630", y: "-550", z: "0" },
     home: defaultAxis(),
     speed: "90",
     approachHeight: "100",

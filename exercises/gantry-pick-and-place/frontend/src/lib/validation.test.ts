@@ -12,8 +12,8 @@ import { configFixture } from "../test/fixtures";
 describe("config defaults", () => {
   it("returns the documented defaults", () => {
     expect(emptyConfigValues()).toEqual({
-      cube: { x: "-750", y: "750", z: "0" },
-      destination: { x: "700", y: "-700", z: "0" },
+      cube: { x: "-650", y: "650", z: "0" },
+      destination: { x: "630", y: "-550", z: "0" },
       home: { x: "0", y: "0", z: "0" },
       speed: "90",
       approachHeight: "100",
@@ -22,8 +22,8 @@ describe("config defaults", () => {
 
   it("converts a server config to strings", () => {
     const values = configValuesFromMachineConfig(configFixture());
-    expect(values.cube).toEqual({ x: "-750", y: "750", z: "0" });
-    expect(values.destination).toEqual({ x: "700", y: "-700", z: "0" });
+    expect(values.cube).toEqual({ x: "-650", y: "650", z: "0" });
+    expect(values.destination).toEqual({ x: "630", y: "-550", z: "0" });
     expect(values.home).toEqual({ x: "0", y: "0", z: "0" });
     expect(values.speed).toBe("90");
     expect(values.approachHeight).toBe("100");
@@ -116,8 +116,8 @@ describe("validateConfig", () => {
 describe("configToPayload", () => {
   it("converts a valid form to numbers", () => {
     expect(configToPayload(emptyConfigValues())).toEqual({
-      cubePosition: { x: -750, y: 750, z: 0 },
-      destinationPosition: { x: 700, y: -700, z: 0 },
+      cubePosition: { x: -650, y: 650, z: 0 },
+      destinationPosition: { x: 630, y: -550, z: 0 },
       homePosition: { x: 0, y: 0, z: 0 },
       speed: 90,
       approachHeight: 100,

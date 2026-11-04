@@ -24,8 +24,8 @@ export function configFixture(
 ): MachineConfig {
   return {
     ...create(MachineConfigSchema, {
-      cubePosition: { x: -750, y: 750, z: 0 },
-      destinationPosition: { x: 700, y: -700, z: 0 },
+      cubePosition: { x: -650, y: 650, z: 0 },
+      destinationPosition: { x: 630, y: -550, z: 0 },
       homePosition: { x: 0, y: 0, z: 0 },
       speed: 90,
       approachHeight: 100,

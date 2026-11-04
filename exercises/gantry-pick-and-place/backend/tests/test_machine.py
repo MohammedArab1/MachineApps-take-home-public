@@ -17,14 +17,14 @@ from app.models import DEFAULT_CONFIG, MachineConfig, Position
 from tests.conftest import FakeRobot
 
 EXPECTED_SEQUENCE = [
-    ("move_to", [-750.0, 750.0, 100.0]),
-    ("move_to", [-750.0, 750.0, 0.0]),
+    ("move_to", [-650.0, 650.0, 100.0]),
+    ("move_to", [-650.0, 650.0, 0.0]),
     ("close",),
-    ("move_to", [-750.0, 750.0, 100.0]),
-    ("move_to", [700.0, -700.0, 100.0]),
-    ("move_to", [700.0, -700.0, 0.0]),
+    ("move_to", [-650.0, 650.0, 100.0]),
+    ("move_to", [630.0, -550.0, 100.0]),
+    ("move_to", [630.0, -550.0, 0.0]),
     ("open",),
-    ("move_to", [700.0, -700.0, 100.0]),
+    ("move_to", [630.0, -550.0, 100.0]),
 ]
 
 
@@ -73,7 +73,7 @@ async def test_happy_path_exact_sequence(
     assert machine.fault_message == ""
     assert simplified(fake_robot.calls) == EXPECTED_SEQUENCE
     assert fake_robot.gripper == "open"
-    assert fake_robot.current_position == [700.0, -700.0, 100.0]
+    assert fake_robot.current_position == [630.0, -550.0, 100.0]
 
 
 async def test_move_to_is_called_repeatedly(

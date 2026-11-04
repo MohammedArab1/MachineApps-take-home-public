@@ -5,9 +5,12 @@ import {
   SCENE_PAD,
   SCENE_SIZE,
   SCENE_VIEW_WIDTH,
-  TABLES,
+  TABLE_A,
+  TABLE_B,
   Z_GAUGE,
   clampWorld,
+  diamondPoints,
+  pointsAttribute,
   rectToSvg,
   worldToSvg,
   zToGauge,
@@ -33,10 +36,10 @@ export function SceneView({ status }: SceneViewProps) {
   );
   const basePoint = worldToSvg(0, 0);
   const footprint = rectToSvg({ x: -1000, y: -1000, width: 2000, height: 2000 });
-  const tableA = rectToSvg(TABLES.a);
-  const tableB = rectToSvg(TABLES.b);
-  const tableALabel = worldToSvg(TABLES.a.x, TABLES.a.y + TABLES.a.height);
-  const tableBLabel = worldToSvg(TABLES.b.x, TABLES.b.y + TABLES.b.height);
+  const tableA = rectToSvg(TABLE_A);
+  const tableBPoints = pointsAttribute(diamondPoints(TABLE_B));
+  const tableALabel = worldToSvg(TABLE_A.x, TABLE_A.y + TABLE_A.height);
+  const tableBLabel = worldToSvg(TABLE_B.centerX, TABLE_B.centerY + 250);
   const zMarker = zToGauge(robot.z);
   const approachMarker = zToGauge(approach);
   const isFault = status.state === "fault" || Boolean(status.fault);
@@ -116,25 +119,23 @@ export function SceneView({ status }: SceneViewProps) {
           y={tableALabel.cy + 22}
           textAnchor="start"
         >
-          {TABLES.a.label}
+          {TABLE_A.label}
         </text>
 
-        <rect
+        <polygon
           className="scene-table scene-table--b"
           data-testid="scene-table-b"
-          x={tableB.x}
-          y={tableB.y}
-          width={tableB.width}
-          height={tableB.height}
-          rx={3}
+          points={tableBPoints}
         />
         <text
           className="scene-label scene-label--table"
-          x={tableBLabel.cx + 12}
-          y={tableBLabel.cy + 22}
-          textAnchor="start"
+          x={tableBLabel.cx}
+          y={tableBLabel.cy}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          transform={`rotate(-45 ${tableBLabel.cx} ${tableBLabel.cy})`}
         >
-          {TABLES.b.label}
+          {TABLE_B.label}
         </text>
 
         <line

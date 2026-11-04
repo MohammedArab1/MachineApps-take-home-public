@@ -32,8 +32,8 @@ describe("ConfigForm", () => {
   it("starts saved and disabled until edited", () => {
     renderForm();
 
-    expect(screen.getByLabelText("Cube X")).toHaveValue(-750);
-    expect(screen.getByLabelText("Destination X")).toHaveValue(700);
+    expect(screen.getByLabelText("Cube X")).toHaveValue(-650);
+    expect(screen.getByLabelText("Destination X")).toHaveValue(630);
     expect(screen.getByLabelText("Home Z")).toHaveValue(0);
     expect(screen.getByLabelText("Speed (mm/s)")).toHaveValue(90);
     expect(screen.getByLabelText("Approach height (mm)")).toHaveValue(100);
@@ -61,8 +61,8 @@ describe("ConfigForm", () => {
 
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
     expect(onSave.mock.calls[0][0]).toEqual({
-      cube: { x: "-500", y: "750", z: "0" },
-      destination: { x: "700", y: "-700", z: "0" },
+      cube: { x: "-500", y: "650", z: "0" },
+      destination: { x: "630", y: "-550", z: "0" },
       home: { x: "0", y: "0", z: "0" },
       speed: "90",
       approachHeight: "100",
@@ -141,7 +141,7 @@ describe("ConfigForm", () => {
     await user.type(cubeX, "-500");
     await user.click(screen.getByRole("button", { name: "Discard changes" }));
 
-    expect(screen.getByLabelText("Cube X")).toHaveValue(-750);
+    expect(screen.getByLabelText("Cube X")).toHaveValue(-650);
     expect(screen.getByText("Saved")).toBeInTheDocument();
   });
 

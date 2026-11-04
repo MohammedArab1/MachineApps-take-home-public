@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   GRID_VALUES,
   SCENE_SIZE,
-  TABLES,
+  TABLE_A,
+  TABLE_B,
   Z_GAUGE,
   clampWorld,
+  diamondPoints,
+  pointsAttribute,
   rectToSvg,
   worldToSvg,
   zToGauge,
@@ -35,23 +38,24 @@ describe("clampWorld", () => {
 });
 
 describe("tables", () => {
-  it("maps Table A and Table B to their footprint regions", () => {
-    expect(rectToSvg(TABLES.a)).toEqual({
-      x: 44,
-      y: 44,
-      width: 138,
-      height: 138,
-    });
-    const tableB = rectToSvg(TABLES.b);
-    expect(tableB.x).toBeCloseTo(458);
-    expect(tableB.y).toBeCloseTo(458);
-    expect(tableB.width).toBe(138);
-    expect(tableB.height).toBe(138);
+  it("draws Table A as an inset 500 mm square", () => {
+    const tableA = rectToSvg(TABLE_A);
+    expect(tableA.x).toBeCloseTo(71.6);
+    expect(tableA.y).toBeCloseTo(71.6);
+    expect(tableA.width).toBe(138);
+    expect(tableA.height).toBe(138);
+    expect(TABLE_A.label).toBe("Table A");
   });
 
-  it("labels the tables", () => {
-    expect(TABLES.a.label).toBe("Table A");
-    expect(TABLES.b.label).toBe("Table B");
+  it("draws Table B as a 500 mm square rotated 45 degrees", () => {
+    const points = diamondPoints(TABLE_B);
+    expect(points).toHaveLength(4);
+    expect(points.map((point) => point.cx).sort((a, b) => a - b)[0]).toBeCloseTo(396.3);
+    expect(points.map((point) => point.cx).sort((a, b) => a - b)[3]).toBeCloseTo(591.46);
+    expect(points.map((point) => point.cy).sort((a, b) => a - b)[0]).toBeCloseTo(374.22);
+    expect(points.map((point) => point.cy).sort((a, b) => a - b)[3]).toBeCloseTo(569.38);
+    expect(pointsAttribute(points).split(" ")).toHaveLength(4);
+    expect(TABLE_B.label).toBe("Table B");
   });
 });
 

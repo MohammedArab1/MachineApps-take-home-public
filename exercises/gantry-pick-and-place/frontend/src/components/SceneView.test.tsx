@@ -24,18 +24,20 @@ describe("SceneView", () => {
     expect(numericAttribute(robot, "cy")).toBeCloseTo(320);
 
     const cube = screen.getByTestId("scene-cube");
-    expect(numericAttribute(cube, "x") + 8).toBeCloseTo(113);
-    expect(numericAttribute(cube, "y") + 8).toBeCloseTo(113);
+    expect(numericAttribute(cube, "x") + 8).toBeCloseTo(140.6);
+    expect(numericAttribute(cube, "y") + 8).toBeCloseTo(140.6);
 
     const destination = screen.getByTestId("scene-destination");
-    expect(numericAttribute(destination, "cx")).toBeCloseTo(513.2);
-    expect(numericAttribute(destination, "cy")).toBeCloseTo(513.2);
+    expect(numericAttribute(destination, "cx")).toBeCloseTo(493.88);
+    expect(numericAttribute(destination, "cy")).toBeCloseTo(471.8);
 
     const zMarker = screen.getByTestId("scene-z-marker");
     expect(numericAttribute(zMarker, "cy")).toBeCloseTo(512);
 
     expect(screen.getByTestId("scene-table-a")).toBeInTheDocument();
-    expect(screen.getByTestId("scene-table-b")).toBeInTheDocument();
+    const tableB = screen.getByTestId("scene-table-b");
+    expect(tableB.tagName.toLowerCase()).toBe("polygon");
+    expect((tableB.getAttribute("points") ?? "").split(" ")).toHaveLength(4);
     expect(screen.getByRole("img")).toHaveAttribute(
       "aria-label",
       expect.stringContaining("Robot at X 0.0"),

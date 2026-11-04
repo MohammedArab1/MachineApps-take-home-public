@@ -38,8 +38,8 @@ def test_position_rejects_non_finite(bad: float) -> None:
 
 
 def test_default_config_is_valid() -> None:
-    assert DEFAULT_CONFIG.cube_position == Position(x=-750, y=750, z=0)
-    assert DEFAULT_CONFIG.destination_position == Position(x=700, y=-700, z=0)
+    assert DEFAULT_CONFIG.cube_position == Position(x=-650, y=650, z=0)
+    assert DEFAULT_CONFIG.destination_position == Position(x=630, y=-550, z=0)
     assert DEFAULT_CONFIG.home_position == Position(x=0, y=0, z=0)
     assert DEFAULT_CONFIG.speed == 90
     assert DEFAULT_CONFIG.approach_height == 100

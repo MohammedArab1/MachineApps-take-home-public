@@ -67,9 +67,9 @@ class MachineConfig(BaseModel):
         populate_by_name=True,
     )
 
-    cube_position: Position = Field(default_factory=lambda: Position(x=-750.0, y=750.0, z=0.0))
+    cube_position: Position = Field(default_factory=lambda: Position(x=-650.0, y=650.0, z=0.0))
     destination_position: Position = Field(
-        default_factory=lambda: Position(x=700.0, y=-700.0, z=0.0)
+        default_factory=lambda: Position(x=630.0, y=-550.0, z=0.0)
     )
     home_position: Position = Field(default_factory=lambda: Position(x=0.0, y=0.0, z=0.0))
     speed: int = 90

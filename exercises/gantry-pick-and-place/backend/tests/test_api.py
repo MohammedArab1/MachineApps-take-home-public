@@ -79,7 +79,7 @@ async def test_get_status_returns_camel_case_telemetry(api_client) -> None:
     assert body["busy"] is False
     assert body["moving"] is False
     assert body["robotPosition"] == {"x": 0.0, "y": 0.0, "z": 0.0}
-    assert body["config"]["cubePosition"]["x"] == -750.0
+    assert body["config"]["cubePosition"]["x"] == -650.0
     assert body["config"]["approachHeight"] == 100.0
     assert body["limits"] == {"x": 1000.0, "y": 1000.0, "z": 1000.0}
     assert body["updatedAt"]
@@ -92,8 +92,8 @@ async def test_get_config(api_client) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["cubePosition"] == {"x": -750.0, "y": 750.0, "z": 0.0}
-    assert body["destinationPosition"] == {"x": 700.0, "y": -700.0, "z": 0.0}
+    assert body["cubePosition"] == {"x": -650.0, "y": 650.0, "z": 0.0}
+    assert body["destinationPosition"] == {"x": 630.0, "y": -550.0, "z": 0.0}
     assert body["homePosition"] == {"x": 0.0, "y": 0.0, "z": 0.0}
     assert body["speed"] == 90
     assert body["approachHeight"] == 100.0
@@ -128,8 +128,8 @@ async def test_set_config_invalid_returns_structured_error(api_client) -> None:
         client,
         "SetConfig",
         {
-            "cubePosition": {"x": -750, "y": 750, "z": 0},
-            "destinationPosition": {"x": 700, "y": -700, "z": 0},
+            "cubePosition": {"x": -650, "y": 650, "z": 0},
+            "destinationPosition": {"x": 630, "y": -550, "z": 0},
             "homePosition": {"x": 0, "y": 0, "z": 0},
             "speed": 0,
             "approachHeight": 100,
@@ -189,8 +189,8 @@ async def test_home_robot(api_client) -> None:
         client,
         "SetConfig",
         {
-            "cubePosition": {"x": -750, "y": 750, "z": 0},
-            "destinationPosition": {"x": 700, "y": -700, "z": 0},
+            "cubePosition": {"x": -650, "y": 650, "z": 0},
+            "destinationPosition": {"x": 630, "y": -550, "z": 0},
             "homePosition": {"x": 10, "y": 20, "z": 30},
             "speed": 90,
             "approachHeight": 100,
@@ -218,7 +218,7 @@ async def test_start_sequence_runs(api_client) -> None:
     status = (await post(client, "GetStatus")).json()
     assert status["state"] == "ready"
     assert status["progress"] == 1.0
-    assert robot.current_position == [700.0, -700.0, 100.0]
+    assert robot.current_position == [630.0, -550.0, 100.0]
 
 
 async def test_stop_sequence(api_client) -> None:

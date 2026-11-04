@@ -50,7 +50,7 @@ def test_sqlite_first_load_writes_defaults(tmp_path: Path, reset_storage_engine:
     assert loaded == DEFAULT_CONFIG
     row = repository.accessor.get(1)
     assert row is not None
-    assert row.cube_x == -750
+    assert row.cube_x == -650
     assert row.speed == 90
 
 
@@ -105,7 +105,7 @@ def test_invalid_persisted_row_falls_back_to_defaults(
     assert loaded == DEFAULT_CONFIG
     row = repository.accessor.get(1)
     assert row is not None
-    assert row.cube_x == -750
+    assert row.cube_x == -650
 
 
 def test_load_returns_defaults_when_the_accessor_fails(
