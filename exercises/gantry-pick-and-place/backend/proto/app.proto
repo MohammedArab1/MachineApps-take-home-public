@@ -1,0 +1,85 @@
+syntax = "proto3";
+package vention.app.v1;
+
+import "google/protobuf/empty.proto";
+
+
+message Position {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+message MachineConfig {
+  Position cube_position = 1;
+  Position destination_position = 2;
+  Position home_position = 3;
+  int32 speed = 4;
+  double approach_height = 5;
+}
+
+message StatusSnapshot {
+  Position robot_position = 1;
+  string gripper = 2;
+  bool moving = 3;
+  bool busy = 4;
+  string state = 5;
+  string step = 6;
+  string fault = 7;
+  double progress = 8;
+  MachineConfig config = 9;
+  Position limits = 10;
+  string updated_at = 11;
+}
+
+message SetConfigRequest {
+  Position cube_position = 1;
+  Position destination_position = 2;
+  Position home_position = 3;
+  int32 speed = 4;
+  double approach_height = 5;
+}
+
+message ActionResult {
+  bool ok = 1;
+  string message = 2;
+  StatusSnapshot status = 3;
+}
+
+message RobotState {
+  Position position = 1;
+  string gripper = 2;
+  bool moving = 3;
+}
+
+message MoveRobotRequest {
+  Position position = 1;
+}
+
+message Event {
+  int32 id = 1;
+  string timestamp = 2;
+  string level = 3;
+  string message = 4;
+  string detail = 5;
+}
+
+message EventList {
+  repeated Event events = 1;
+}
+
+service GantryPickAndPlaceService {
+  rpc GetStatus (google.protobuf.Empty) returns (StatusSnapshot);
+  rpc GetConfig (google.protobuf.Empty) returns (MachineConfig);
+  rpc SetConfig (SetConfigRequest) returns (ActionResult);
+  rpc GetRobotPosition (google.protobuf.Empty) returns (RobotState);
+  rpc SetRobotPosition (MoveRobotRequest) returns (ActionResult);
+  rpc HomeRobot (google.protobuf.Empty) returns (ActionResult);
+  rpc StartSequence (google.protobuf.Empty) returns (ActionResult);
+  rpc StopSequence (google.protobuf.Empty) returns (ActionResult);
+  rpc Reset (google.protobuf.Empty) returns (ActionResult);
+  rpc RecentEvents (google.protobuf.Empty) returns (EventList);
+  rpc SimulateFault (google.protobuf.Empty) returns (ActionResult);
+  rpc Status (google.protobuf.Empty) returns (stream StatusSnapshot);
+  rpc Events (google.protobuf.Empty) returns (stream Event);
+}

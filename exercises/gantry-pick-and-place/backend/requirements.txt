@@ -1,5 +1,5 @@
+fastapi==0.121.1
+uvicorn[standard]==0.35.0
+vention-communication==0.3.0
 vention-state-machine==0.3.1
-fastapi>=0.100.0
-uvicorn[standard]>=0.23.0
 vention-storage==0.5.4
-

@@ -1,0 +1,17 @@
+**/node_modules
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov
+**/dist
+**/data
+**/.git
+**/.DS_Store
+**/coverage
+**/src/gen
+**/test-results
+**/playwright-report
