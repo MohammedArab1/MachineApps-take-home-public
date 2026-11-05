@@ -259,6 +259,8 @@ class GantryService:
                 return await self._result(False, "An operation is already running")
             if self.robot.moving:
                 return await self._result(False, "The robot is still moving")
+            if self.robot.gripper != "open":
+                return await self._result(False, "Open the gripper before starting the sequence")
             self._active_operation = "sequence"
             if not self.machine.start_sequence(self.config):
                 self._active_operation = ""

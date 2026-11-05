@@ -101,6 +101,8 @@ make build
   the robot is idle and not faulted; Stop remains available while an operation
   is running, even if the telemetry stream drops. Manual commands are rejected
   by the backend and disabled in the UI while the crane is moving or faulted.
+  Start is also disabled while the gripper is closed; open it in Manual control
+  first.
 - **Configuration**: cube start, destination, home, speed, and approach height.
   The form validates locally and the server validates again. Configuration is
   persisted through `vention-storage`.
@@ -239,6 +241,8 @@ All application traffic uses Connect RPC under `/rpc`:
 machine, not a teleport. `JogRobot` is a relative move along one axis.
 `OpenGripper` and `CloseGripper` are manual gripper commands. All manual
 commands are rejected unless the machine is `ready` and the robot is stopped.
+`StartSequence` is also rejected unless the gripper is open, so a pick cannot
+begin with a closed gripper after a manual close or an interrupted run.
 
 Every command returns:
 
@@ -428,16 +432,16 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 
 ### Testing strategy
 
-- **Backend:** 175 tests. A deterministic `FakeRobot` exercises the state
+- **Backend:** 177 tests. A deterministic `FakeRobot` exercises the state
   machine without sleeping; the real simulator adapter is tested with a patched
   clock; the SQLite repositories are tested with a temporary database and a
   simulated restart; the Connect actions are exercised through the real ASGI
   app; a real uvicorn subprocess verifies the stream framing; the proto is
   checked against the Python surface. Coverage is ~98.6% of `app/`.
-- **Frontend:** 88 tests with Vitest + React Testing Library. Scene math,
+- **Frontend:** 89 tests with Vitest + React Testing Library. Scene math,
   validation, event merging, every component state, the manual panel, the
   stream hook's reconnect/stall/unmount behavior, and the app's loading/
-  connected/fault/disconnected flows. Coverage is ~95.6%.
+  connected/fault/disconnected flows. Coverage is ~95.8%.
 - **CI:** GitHub Actions runs backend lint/tests/proto check and frontend
   lint/typecheck/coverage/build on every push and pull request.
 
@@ -453,6 +457,9 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 - The run state is persisted, but motion is never auto-resumed. An interrupted
   operation comes up in `fault` and requires Reset. A real machine additionally
   needs an explicit re-home and hardware safety checks.
+- Start requires an open gripper. A closed gripper can be opened in Manual
+  control. This prevents starting a pick with the gripper already closed after a
+  manual close or an interrupted run.
 - Manual jog and gripper commands require the machine to be `ready` and the
   robot to be stopped. Jogs use the configured speed, limits, and motion
   timeout.

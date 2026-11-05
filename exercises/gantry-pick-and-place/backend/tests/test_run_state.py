@@ -342,3 +342,19 @@ async def test_manual_commands_require_a_stopped_robot(
     assert not (await service.jog_robot(JogRobotRequest(axis="x", delta=10))).ok
     assert not (await service.start_sequence()).ok
     assert not (await service.home_robot()).ok
+
+
+async def test_start_sequence_requires_an_open_gripper(
+    service: GantryService, fake_robot: FakeRobot
+) -> None:
+    fake_robot.gripper = "closed"
+
+    result = await service.start_sequence()
+    assert not result.ok
+    assert "Open the gripper" in result.message
+    assert service.machine.state == "ready"
+
+    assert (await service.open_gripper()).ok
+    assert (await service.start_sequence()).ok
+    await wait_done(service.machine)
+    assert service.machine.state == "ready"

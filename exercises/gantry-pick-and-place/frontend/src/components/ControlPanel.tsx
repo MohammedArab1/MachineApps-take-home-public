@@ -29,9 +29,11 @@ export function ControlPanel({
 }: ControlPanelProps) {
   const busy = status.busy;
   const faulted = status.state === "fault";
+  const gripperClosed = status.gripper === "closed";
   const commandsBlocked = pending !== null;
 
-  const startDisabled = !connected || busy || faulted || commandsBlocked;
+  const startDisabled =
+    !connected || busy || faulted || gripperClosed || commandsBlocked;
   const homeDisabled = !connected || busy || faulted || commandsBlocked;
   const stopDisabled = !busy || commandsBlocked;
   const resetDisabled = !connected || !faulted || commandsBlocked;
@@ -41,6 +43,7 @@ export function ControlPanel({
   if (faulted) hint = "The robot is faulted. Reset before moving.";
   else if (!connected) hint = "Live connection lost. Start and Home are disabled.";
   else if (busy) hint = "An operation is running. Stop is available.";
+  else if (gripperClosed) hint = "Open the gripper before starting the sequence.";
 
   return (
     <section className="panel controls" aria-labelledby="controls-heading">

@@ -321,3 +321,17 @@ async def test_manual_gripper_actions(api_client) -> None:
     assert opened.json()["ok"] is True
     assert opened.json()["status"]["gripper"] == "open"
     assert robot.gripper == "open"
+
+
+async def test_start_sequence_rejected_with_closed_gripper(api_client) -> None:
+    client, service, robot = api_client
+    robot.gripper = "closed"
+
+    response = await post(client, "StartSequence")
+    assert response.json()["ok"] is False
+    assert "Open the gripper" in response.json()["message"]
+    assert service.machine.state == "ready"
+
+    assert (await post(client, "OpenGripper")).json()["ok"] is True
+    assert (await post(client, "StartSequence")).json()["ok"] is True
+    await wait_done(service.machine)

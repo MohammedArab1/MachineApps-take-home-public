@@ -86,6 +86,20 @@ describe("ControlPanel", () => {
     );
   });
 
+  it("disables Start until the gripper is open", () => {
+    const closed = renderPanel(statusFixture({ gripper: "closed" }));
+
+    expect(screen.getByRole("button", { name: "Start sequence" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Home robot" })).toBeEnabled();
+    expect(screen.getByTestId("control-hint")).toHaveTextContent(
+      "Open the gripper before starting the sequence.",
+    );
+    closed.unmount();
+
+    renderPanel(statusFixture({ gripper: "open" }));
+    expect(screen.getByRole("button", { name: "Start sequence" })).toBeEnabled();
+  });
+
   it("invokes the command callbacks", async () => {
     const user = userEvent.setup();
     const first = renderPanel();
