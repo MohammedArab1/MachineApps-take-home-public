@@ -2,7 +2,11 @@ import { create } from "@bufbuild/protobuf";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 
-import { GantryPickAndPlaceService, SetConfigRequestSchema } from "./gen/app_pb";
+import {
+  GantryPickAndPlaceService,
+  JogRobotRequestSchema,
+  SetConfigRequestSchema,
+} from "./gen/app_pb";
 import type { ConfigPayload } from "./types";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "/rpc";
@@ -34,6 +38,17 @@ export const setConfig = (config: ConfigPayload) =>
   client.setConfig(create(SetConfigRequestSchema, config), {
     timeoutMs: COMMAND_TIMEOUT_MS,
   });
+
+export const jogRobot = (axis: string, delta: number) =>
+  client.jogRobot(create(JogRobotRequestSchema, { axis, delta }), {
+    timeoutMs: COMMAND_TIMEOUT_MS,
+  });
+
+export const openGripper = () =>
+  client.openGripper({}, { timeoutMs: COMMAND_TIMEOUT_MS });
+
+export const closeGripper = () =>
+  client.closeGripper({}, { timeoutMs: COMMAND_TIMEOUT_MS });
 
 export const homeRobot = () =>
   client.homeRobot({}, { timeoutMs: COMMAND_TIMEOUT_MS });

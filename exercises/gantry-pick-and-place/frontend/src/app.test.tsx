@@ -17,6 +17,9 @@ vi.mock("./client", () => ({
   openEvents: vi.fn(),
   recentEvents: vi.fn(),
   setConfig: vi.fn(),
+  jogRobot: vi.fn(),
+  openGripper: vi.fn(),
+  closeGripper: vi.fn(),
   homeRobot: vi.fn(),
   startSequence: vi.fn(),
   stopSequence: vi.fn(),
@@ -63,6 +66,15 @@ beforeEach(() => {
   vi.mocked(client.recentEvents).mockResolvedValue(eventList([]));
   vi.mocked(client.setConfig).mockResolvedValue(
     actionResult(true, "Configuration saved"),
+  );
+  vi.mocked(client.jogRobot).mockResolvedValue(
+    actionResult(true, "Manual jog started"),
+  );
+  vi.mocked(client.openGripper).mockResolvedValue(
+    actionResult(true, "Gripper open"),
+  );
+  vi.mocked(client.closeGripper).mockResolvedValue(
+    actionResult(true, "Gripper closed"),
   );
   vi.mocked(client.homeRobot).mockResolvedValue(
     actionResult(true, "Homing started"),
@@ -258,5 +270,19 @@ describe("App", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("command-alert")).not.toBeInTheDocument(),
     );
+  });
+
+  it("jogs and controls the gripper from the manual panel", async () => {
+    const user = userEvent.setup();
+    mockStreams(statusFixture());
+
+    render(<App />);
+    await screen.findByText("Telemetry");
+
+    await user.click(screen.getByRole("button", { name: "Jog X positive" }));
+    expect(client.jogRobot).toHaveBeenCalledWith("x", 50);
+
+    await user.click(screen.getByRole("button", { name: "Close gripper" }));
+    expect(client.closeGripper).toHaveBeenCalledOnce();
   });
 });

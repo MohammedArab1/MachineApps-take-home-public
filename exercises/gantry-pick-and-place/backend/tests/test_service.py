@@ -15,7 +15,7 @@ from app.models import (
     Position,
     SetConfigRequest,
 )
-from app.repository import InMemoryConfigRepository
+from app.repository import InMemoryConfigRepository, InMemoryRunStateRepository
 from app.service import GantryService
 from tests.conftest import FakeRobot, FakeTelemetry
 
@@ -52,12 +52,14 @@ def make_service(
     settings,
     repository,
     telemetry: FakeTelemetry | None = None,
+    run_state_repository: InMemoryRunStateRepository | None = None,
 ) -> GantryService:
     return GantryService(
         robot,
         machine,
         repository,
         settings,
+        run_state_repository=run_state_repository or InMemoryRunStateRepository(),
         telemetry=telemetry or FakeTelemetry(),
     )
 

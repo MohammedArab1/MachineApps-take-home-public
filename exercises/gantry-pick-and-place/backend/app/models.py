@@ -151,6 +151,39 @@ class MoveRobotRequest(BaseModel):
     position: Position = Field(default_factory=Position)
 
 
+class JogRobotRequest(BaseModel):
+    """One relative manual move along a single axis."""
+
+    model_config = ConfigDict(
+        extra="ignore",
+        allow_inf_nan=False,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    axis: str = "x"
+    delta: float = 0.0
+
+
+class RunState(BaseModel):
+    """Small persisted record of the last operation and robot state."""
+
+    model_config = ConfigDict(
+        extra="ignore",
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    status: str = "idle"
+    operation: str = ""
+    state: str = "ready"
+    step: str = "Ready"
+    robot_position: Position = Field(default_factory=Position)
+    gripper: str = "open"
+    fault: str = ""
+    updated_at: str = Field(default_factory=utc_now_iso)
+
+
 class RobotState(BaseModel):
     model_config = ConfigDict(
         extra="ignore",

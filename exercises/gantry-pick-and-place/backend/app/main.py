@@ -23,7 +23,7 @@ from storage.bootstrap import bootstrap
 from app import api
 from app.config import Settings
 from app.machine import PickAndPlaceMachine
-from app.repository import SqliteConfigRepository
+from app.repository import SqliteConfigRepository, SqliteRunStateRepository
 from app.robot import SimRobotDriver
 from app.service import GantryService
 from app.telemetry import Telemetry
@@ -49,11 +49,11 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         task.cancel()
         with suppress(asyncio.CancelledError):
             await task
-        await service.machine.cancel_tasks()
-        service.robot.halt()
+        await service.shutdown()
 
 
 repository = SqliteConfigRepository(settings.db_url)
+run_state_repository = SqliteRunStateRepository(settings.db_url)
 
 app = VentionApp(
     name="GantryPickAndPlace",
@@ -71,7 +71,7 @@ app.add_middleware(
 
 bootstrap(
     app,
-    accessors=[repository.accessor],
+    accessors=[repository.accessor, run_state_repository.accessor],
     database_url=settings.db_url,
     create_tables=True,
     max_records_per_model=None,
@@ -93,7 +93,13 @@ machine = PickAndPlaceMachine(
     motion_timeout_factor=settings.motion_timeout_factor,
     motion_timeout_margin_s=settings.motion_timeout_margin_s,
 )
-service = GantryService(robot, machine, repository, settings)
+service = GantryService(
+    robot,
+    machine,
+    repository,
+    settings,
+    run_state_repository=run_state_repository,
+)
 api.bind(service)
 runtime["service"] = service
 runtime["telemetry"] = service.telemetry

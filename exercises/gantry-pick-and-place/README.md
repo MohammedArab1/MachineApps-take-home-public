@@ -96,9 +96,11 @@ make build
 - **Cell view**: an SVG plan view of the 2 m × 2 m footprint with Table A,
   Table B, the robot base and current position, the cube, the destination, and
   a vertical Z gauge.
-- **Controls**: Home, Start, Stop, and Reset. Buttons are enabled only when the
-  state machine allows the command; Stop remains available while an operation
-  is running, even if the telemetry stream drops.
+- **Controls**: Home, Start, Stop, and Reset, plus a **Manual control** panel
+  with X/Y/Z jogs and open/close gripper. Motion commands are enabled only when
+  the robot is idle and not faulted; Stop remains available while an operation
+  is running, even if the telemetry stream drops. Manual commands are rejected
+  by the backend and disabled in the UI while the crane is moving or faulted.
 - **Configuration**: cube start, destination, home, speed, and approach height.
   The form validates locally and the server validates again. Configuration is
   persisted through `vention-storage`.
@@ -221,6 +223,9 @@ All application traffic uses Connect RPC under `/rpc`:
 | `SetConfig` | action | `SetConfigRequest` | `ActionResult` |
 | `GetRobotPosition` | action | `Empty` | `RobotState` |
 | `SetRobotPosition` | action | `MoveRobotRequest` | `ActionResult` |
+| `JogRobot` | action | `JogRobotRequest` | `ActionResult` |
+| `OpenGripper` | action | `Empty` | `ActionResult` |
+| `CloseGripper` | action | `Empty` | `ActionResult` |
 | `HomeRobot` | action | `Empty` | `ActionResult` |
 | `StartSequence` | action | `Empty` | `ActionResult` |
 | `StopSequence` | action | `Empty` | `ActionResult` |
@@ -230,8 +235,10 @@ All application traffic uses Connect RPC under `/rpc`:
 | `Status` | stream | `Empty` | `StatusSnapshot` |
 | `Events` | stream | `Empty` | `Event` |
 
-`SetRobotPosition` is a **manual move** through the same state machine, not a
-teleport. It is rejected while another operation is running.
+`SetRobotPosition` is an absolute **manual move** through the same state
+machine, not a teleport. `JogRobot` is a relative move along one axis.
+`OpenGripper` and `CloseGripper` are manual gripper commands. All manual
+commands are rejected unless the machine is `ready` and the robot is stopped.
 
 Every command returns:
 
@@ -374,12 +381,36 @@ The frontend displays both domain rejections and network/timeout errors.
 
 ### Persistence
 
-A single-row SQLModel table (`gantry_config`) stores the configuration through
-`vention-storage`. `bootstrap` creates the table; the `ModelAccessor` reads and
-writes the row with audit logging. The repository protocol has an in-memory
-implementation so unit/API tests do not depend on SQLite. If a persisted row is
-invalid (manual edit/corruption), the app logs a warning, falls back to
-defaults, and rewrites the row.
+Two single-row SQLModel tables are persisted through `vention-storage`:
+
+- `gantry_config` — cube, destination, home, speed, and approach height.
+- `gantry_run_state` — status, operation, state, step, last robot position,
+  gripper state, fault message, and timestamp.
+
+`bootstrap` creates both tables; the `ModelAccessor` reads and writes them with
+audit logging. The repository protocols have in-memory implementations so
+unit/API tests do not depend on SQLite. If a config row is invalid, the app logs
+a warning, falls back to defaults, and rewrites it.
+
+The run state is updated on every state transition, on manual gripper commands,
+and on safe shutdown. On startup:
+
+- `running` or `interrupted` → the machine enters `fault` with a message naming
+  the interrupted step and last known position; the operator must inspect the
+  cell and press Reset.
+- `fault` → the fault is restored, so a fault is never silently cleared by a
+  restart.
+- `idle` → the machine starts ready, with the persisted gripper state restored.
+
+The app never auto-resumes motion. The run state is a safety record, not a
+durable execution engine. A hard kill (SIGKILL) cannot run cleanup, but the last
+persisted `running` record still forces a fault on the next start.
+
+The FastAPI lifespan cancels the telemetry and step tasks, halts the simulator,
+and records `interrupted` if an operation was active. The robot is left stopped
+where it was; the simulator starts at the configured home on the next process
+start. A real machine would need an explicit re-home and hardware safety
+checks.
 
 ### One uvicorn worker
 
@@ -397,16 +428,16 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 
 ### Testing strategy
 
-- **Backend:** 154 tests. A deterministic `FakeRobot` exercises the state
+- **Backend:** 175 tests. A deterministic `FakeRobot` exercises the state
   machine without sleeping; the real simulator adapter is tested with a patched
-  clock; the SQLite repository is tested with a temporary database and a
+  clock; the SQLite repositories are tested with a temporary database and a
   simulated restart; the Connect actions are exercised through the real ASGI
   app; a real uvicorn subprocess verifies the stream framing; the proto is
-  checked against the Python surface. Coverage is 99.9% of `app/`.
-- **Frontend:** 81 tests with Vitest + React Testing Library. Scene math,
-  validation, event merging, every component state, the stream hook's
-  reconnect/stall/unmount behavior, and the app's loading/connected/fault/
-  disconnected flows. Coverage is ~95%.
+  checked against the Python surface. Coverage is ~98.6% of `app/`.
+- **Frontend:** 88 tests with Vitest + React Testing Library. Scene math,
+  validation, event merging, every component state, the manual panel, the
+  stream hook's reconnect/stall/unmount behavior, and the app's loading/
+  connected/fault/disconnected flows. Coverage is ~95.6%.
 - **CI:** GitHub Actions runs backend lint/tests/proto check and frontend
   lint/typecheck/coverage/build on every push and pull request.
 
@@ -419,6 +450,12 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
   configured cube and destination points, not from the table polygons, so the
   table placement does not affect the control logic. The defaults are the
   measured table centres.
+- The run state is persisted, but motion is never auto-resumed. An interrupted
+  operation comes up in `fault` and requires Reset. A real machine additionally
+  needs an explicit re-home and hardware safety checks.
+- Manual jog and gripper commands require the machine to be `ready` and the
+  robot to be stopped. Jogs use the configured speed, limits, and motion
+  timeout.
 - One operator, one browser, one backend worker, no authentication.
 - The `SimulateFault` action is a demo aid. It is always in the proto but the
   backend refuses it when `GANTRY_ENABLE_DEV_TOOLS=false`; the frontend hides
@@ -438,9 +475,14 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 4. The sequence ends lifted above Table B. Click **Home robot** to return.
 5. Edit the cube or destination coordinates and click **Save configuration**.
    Reload the page; the values are restored from SQLite.
-6. In local dev, open **Developer tools → Simulate fault** to see the red fault
+6. Use **Manual control** to jog X/Y/Z by 10, 50, or 100 mm and to open or close
+   the gripper. The panel is locked while the robot is moving or faulted.
+7. Start a sequence, stop the server mid-operation, and start it again. The
+   dashboard comes up in `fault` with an interrupted-operation message; press
+   **Reset fault** to recover.
+8. In local dev, open **Developer tools → Simulate fault** to see the red fault
    banner, then click **Reset fault**.
-7. Click **Stop** during a sequence to halt at the current position; Start is
+9. Click **Stop** during a sequence to halt at the current position; Start is
    available again afterwards.
 
 ---

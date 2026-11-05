@@ -1038,3 +1038,79 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------- manual control */
+
+.manual-state {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.manual-state--locked {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.manual-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.manual-toolbar select {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0a1424;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.jog-grid {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.jog-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.jog-axis {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.jog-row .button {
+  min-height: 40px;
+  font-size: 18px;
+}
+
+.gripper-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.manual-warning {
+  margin: 10px 2px 0;
+  color: var(--amber);
+  font-size: 11px;
+  line-height: 1.4;
+}

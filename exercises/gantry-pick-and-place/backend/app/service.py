@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from collections import deque
 
 from pydantic import ValidationError
@@ -15,16 +16,22 @@ from app.models import (
     ActionResult,
     Event,
     EventList,
+    JogRobotRequest,
     MachineConfig,
     MoveRobotRequest,
     Position,
     RobotState,
+    RunState,
     SetConfigRequest,
     StatusSnapshot,
     utc_now_iso,
     validation_message,
 )
-from app.repository import ConfigRepository
+from app.repository import (
+    ConfigRepository,
+    InMemoryRunStateRepository,
+    RunStateRepository,
+)
 from app.robot import RobotDriver
 from app.telemetry import Telemetry, TelemetrySink
 
@@ -41,11 +48,13 @@ class GantryService:
         repository: ConfigRepository,
         settings: Settings,
         *,
+        run_state_repository: RunStateRepository | None = None,
         telemetry: TelemetrySink | None = None,
     ) -> None:
         self.robot = robot
         self.machine = machine
         self.repository = repository
+        self.run_state_repository = run_state_repository or InMemoryRunStateRepository()
         self.settings = settings
         try:
             self.config = repository.load()
@@ -56,6 +65,10 @@ class GantryService:
         self._recent_events: deque[Event] = deque(maxlen=100)
         self._event_id = 0
         self._lock = asyncio.Lock()
+        self._active_operation = ""
+
+        self.machine.state_listener = self._on_state_change
+        self._restore_run_state()
 
     # ------------------------------------------------------------------
     # Snapshots
@@ -88,6 +101,95 @@ class GantryService:
 
     async def recent_events(self) -> EventList:
         return EventList(events=list(reversed(self._recent_events)))
+
+    # ------------------------------------------------------------------
+    # Persisted run state
+    # ------------------------------------------------------------------
+
+    def _restore_run_state(self) -> None:
+        """Restore the last known gripper/run state and fail safe on interruption."""
+
+        try:
+            persisted = self.run_state_repository.load()
+        except Exception:
+            logger.exception("Could not load the persisted run state")
+            persisted = None
+
+        if persisted is None:
+            self._save_run_state_safely("idle")
+            return
+
+        if persisted.gripper == "closed":
+            self.robot.close_gripper()
+        else:
+            self.robot.open_gripper()
+
+        if persisted.status in {"running", "interrupted"}:
+            self._active_operation = persisted.operation
+            self.machine.enter_fault(self._interrupted_message(persisted))
+        elif persisted.status == "fault":
+            self._active_operation = persisted.operation
+            self.machine.enter_fault(
+                persisted.fault or "The machine was in a fault state at shutdown."
+            )
+        else:
+            self._active_operation = ""
+            self._save_run_state_safely("idle")
+
+    def _interrupted_message(self, persisted: RunState) -> str:
+        position = persisted.robot_position
+        operation = persisted.operation or "an operation"
+        step = persisted.step or "an unknown step"
+        return (
+            f"The application shut down during {operation} at step '{step}'. "
+            f"Last known position: X {position.x:g}, Y {position.y:g}, Z "
+            f"{position.z:g}; gripper {persisted.gripper}. "
+            "The robot has been stopped. Inspect the cell, then press Reset."
+        )
+
+    def _on_state_change(self, _old: str, new_state: str, _trigger: str) -> None:
+        try:
+            if new_state == "ready":
+                self._active_operation = ""
+                status = "idle"
+            elif new_state == "fault":
+                status = "fault"
+            else:
+                status = "running"
+            self._save_run_state(status)
+        except Exception:
+            logger.exception("Could not persist the run state")
+
+    def _save_run_state(self, status: str) -> None:
+        run_state = RunState(
+            status=status,
+            operation=self._active_operation,
+            state=self.machine.state,
+            step=self.machine.step,
+            robot_position=Position.from_list(self.robot.current_position),
+            gripper=self.robot.gripper,
+            fault=self.machine.fault_message,
+            updated_at=utc_now_iso(),
+        )
+        self.run_state_repository.save(run_state)
+
+    def _save_run_state_safely(self, status: str) -> None:
+        try:
+            self._save_run_state(status)
+        except Exception:
+            logger.exception("Could not persist the run state")
+
+    async def shutdown(self) -> None:
+        """Stop the robot and mark an in-progress operation as interrupted."""
+
+        await self.machine.cancel_tasks()
+        self.robot.halt()
+        if self.machine.busy:
+            self._save_run_state_safely("interrupted")
+        elif self.machine.faulted:
+            self._save_run_state_safely("fault")
+        else:
+            self._save_run_state_safely("idle")
 
     # ------------------------------------------------------------------
     # Events / telemetry
@@ -155,7 +257,12 @@ class GantryService:
                 return await self._result(False, "Reset the fault before starting the sequence")
             if self.machine.busy:
                 return await self._result(False, "An operation is already running")
+            if self.robot.moving:
+                return await self._result(False, "The robot is still moving")
+            self._active_operation = "sequence"
             if not self.machine.start_sequence(self.config):
+                self._active_operation = ""
+                self._save_run_state_safely("idle")
                 return await self._result(False, f"Cannot start from state '{self.machine.state}'")
             await self.emit_event(
                 "info",
@@ -170,7 +277,12 @@ class GantryService:
                 return await self._result(False, "Reset the fault before homing")
             if self.machine.busy:
                 return await self._result(False, "An operation is already running")
+            if self.robot.moving:
+                return await self._result(False, "The robot is still moving")
+            self._active_operation = "home"
             if not self.machine.home_robot(self.config):
+                self._active_operation = ""
+                self._save_run_state_safely("idle")
                 return await self._result(False, f"Cannot home from state '{self.machine.state}'")
             await self.emit_event(
                 "info",
@@ -185,13 +297,18 @@ class GantryService:
                 return await self._result(False, "Reset the fault before moving")
             if self.machine.busy:
                 return await self._result(False, "An operation is already running")
+            if self.robot.moving:
+                return await self._result(False, "The robot is still moving")
 
             position = request.position
             if not position.is_within_limits():
                 return await self._result(
                     False, "Target position must be within +/-1000 mm on every axis"
                 )
+            self._active_operation = "manual"
             if not self.machine.manual_move(position.to_list(), self.config.speed):
+                self._active_operation = ""
+                self._save_run_state_safely("idle")
                 return await self._result(False, f"Cannot move from state '{self.machine.state}'")
             await self.emit_event(
                 "info",
@@ -199,6 +316,67 @@ class GantryService:
                 f"Target position {position.to_list()}.",
             )
             return await self._result(True, "Manual move started")
+
+    async def jog_robot(self, request: JogRobotRequest) -> ActionResult:
+        async with self._lock:
+            if self.machine.faulted:
+                return await self._result(False, "Reset the fault before moving")
+            if self.machine.busy:
+                return await self._result(False, "An operation is already running")
+            if self.robot.moving:
+                return await self._result(False, "The robot is still moving")
+
+            axis = request.axis.strip().lower()
+            if axis not in {"x", "y", "z"}:
+                return await self._result(False, "Axis must be x, y, or z")
+            delta = request.delta
+            if not math.isfinite(delta) or delta == 0:
+                return await self._result(False, "Jog delta must be a non-zero number")
+
+            index = {"x": 0, "y": 1, "z": 2}[axis]
+            target = self.robot.current_position
+            target[index] += delta
+            position = Position.from_list(target)
+            if not position.is_within_limits():
+                return await self._result(
+                    False, "Target position must be within +/-1000 mm on every axis"
+                )
+
+            self._active_operation = "manual"
+            if not self.machine.manual_move(position.to_list(), self.config.speed):
+                self._active_operation = ""
+                self._save_run_state_safely("idle")
+                return await self._result(False, f"Cannot move from state '{self.machine.state}'")
+            await self.emit_event(
+                "info",
+                "Manual jog started",
+                f"{axis.upper()} {delta:+g} mm to {position.to_list()}.",
+            )
+            return await self._result(True, "Manual jog started")
+
+    async def open_gripper(self) -> ActionResult:
+        return await self._set_gripper("open")
+
+    async def close_gripper(self) -> ActionResult:
+        return await self._set_gripper("closed")
+
+    async def _set_gripper(self, state: str) -> ActionResult:
+        async with self._lock:
+            if self.machine.faulted:
+                return await self._result(False, "Reset the fault before changing the gripper")
+            if self.machine.busy or self.robot.moving:
+                return await self._result(False, "Stop the robot before changing the gripper")
+
+            already = self.robot.gripper == state
+            if state == "open":
+                self.robot.open_gripper()
+            else:
+                self.robot.close_gripper()
+            self._active_operation = ""
+            self._save_run_state_safely("idle")
+            message = f"Gripper already {state}" if already else f"Gripper {state}"
+            await self.emit_event("info", message, "Manual gripper command.")
+            return await self._result(True, message)
 
     async def stop_sequence(self) -> ActionResult:
         async with self._lock:

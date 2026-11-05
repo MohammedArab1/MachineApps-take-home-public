@@ -8,6 +8,11 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = BASE_DIR / "data" / "gantry.db"
+DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://localhost:3000"
+
+
+def _parse_origins(value: str) -> tuple[str, ...]:
+    return tuple(origin.strip() for origin in value.split(",") if origin.strip())
 
 
 def _as_bool(value: str | None, default: bool) -> bool:
@@ -25,10 +30,7 @@ class Settings:
     """
 
     db_url: str = f"sqlite:///{DEFAULT_DB_PATH}"
-    cors_origins: tuple[str, ...] = (
-        "http://localhost:5173",
-        "http://localhost:3000",
-    )
+    cors_origins: tuple[str, ...] = _parse_origins(DEFAULT_CORS_ORIGINS)
     poll_interval_s: float = 0.02
     gripper_settle_s: float = 0.15
     status_idle_heartbeat_s: float = 1.0
@@ -40,14 +42,7 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> Settings:
-        cors = tuple(
-            origin.strip()
-            for origin in os.getenv(
-                "GANTRY_CORS_ORIGINS",
-                "http://localhost:5173,http://localhost:3000",
-            ).split(",")
-            if origin.strip()
-        )
+        cors = _parse_origins(os.getenv("GANTRY_CORS_ORIGINS", DEFAULT_CORS_ORIGINS))
         return cls(
             db_url=os.getenv("GANTRY_DB_URL", f"sqlite:///{DEFAULT_DB_PATH}"),
             cors_origins=cors,

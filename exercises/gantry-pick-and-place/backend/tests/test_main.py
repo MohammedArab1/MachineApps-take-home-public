@@ -17,3 +17,6 @@ def test_lifespan_starts_telemetry_and_shuts_down_cleanly() -> None:
 
     # Exiting the context cancels the telemetry task and halts the robot.
     assert main_module.service.robot.moving is False
+    run_state = main_module.service.run_state_repository.load()
+    assert run_state is not None
+    assert run_state.status == "idle"

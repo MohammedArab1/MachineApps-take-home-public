@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from state_machine.core import BaseStates, StateMachine
@@ -153,6 +154,8 @@ class PickAndPlaceMachine(StateMachine):
         self.progress: float = 0.0
         self.operation_done = asyncio.Event()
         self.operation_done.set()
+        # Optional synchronous hook used by the service to persist run state.
+        self.state_listener: Callable[[str, str, str], None] | None = None
 
     # ------------------------------------------------------------------
     # Public commands (the service calls these after its own checks)
@@ -227,6 +230,12 @@ class PickAndPlaceMachine(StateMachine):
 
         if new_state in {BaseStates.READY.value, BaseStates.FAULT.value}:
             self.operation_done.set()
+
+        if self.state_listener is not None:
+            try:
+                self.state_listener(old_state, new_state, _trigger)
+            except Exception:  # noqa: BLE001 - persistence must not break the machine
+                logger.exception("State listener failed")
 
     # ------------------------------------------------------------------
     # Entry callbacks: synchronous, each schedules one async step task

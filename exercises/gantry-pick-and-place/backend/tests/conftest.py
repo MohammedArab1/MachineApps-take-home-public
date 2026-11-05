@@ -18,7 +18,7 @@ import pytest
 from app.config import Settings
 from app.machine import PickAndPlaceMachine
 from app.models import DEFAULT_CONFIG, Event, StatusSnapshot
-from app.repository import InMemoryConfigRepository
+from app.repository import InMemoryConfigRepository, InMemoryRunStateRepository
 from app.robot import RobotError
 from app.service import GantryService
 
@@ -188,11 +188,17 @@ def fake_telemetry() -> FakeTelemetry:
 
 
 @pytest.fixture
+def run_state_repository() -> InMemoryRunStateRepository:
+    return InMemoryRunStateRepository()
+
+
+@pytest.fixture
 def service(
     fake_robot: FakeRobot,
     machine: PickAndPlaceMachine,
     fast_settings: Settings,
     fake_telemetry: FakeTelemetry,
+    run_state_repository: InMemoryRunStateRepository,
 ) -> GantryService:
     repository = InMemoryConfigRepository(DEFAULT_CONFIG)
     return GantryService(
@@ -200,6 +206,7 @@ def service(
         machine,
         repository,
         fast_settings,
+        run_state_repository=run_state_repository,
         telemetry=fake_telemetry,
     )
 

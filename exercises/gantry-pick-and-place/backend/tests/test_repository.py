@@ -8,11 +8,13 @@ import pytest
 import storage.database as database
 from sqlmodel import SQLModel
 
-from app.models import DEFAULT_CONFIG, MachineConfig, Position
+from app.models import DEFAULT_CONFIG, MachineConfig, Position, RunState
 from app.repository import (
     ConfigRow,
     InMemoryConfigRepository,
+    InMemoryRunStateRepository,
     SqliteConfigRepository,
+    SqliteRunStateRepository,
     ensure_sqlite_directory,
 )
 
@@ -173,3 +175,38 @@ def test_invalid_row_restore_failure_is_tolerated(
     monkeypatch.setattr(repository, "save", boom)
 
     assert repository.load() == DEFAULT_CONFIG
+
+
+def test_sqlite_run_state_round_trip_and_restart(
+    tmp_path: Path, reset_storage_engine: None
+) -> None:
+    _, url = build_repo(tmp_path)
+    repository = SqliteRunStateRepository(url)
+    assert repository.load() is None
+
+    run_state = RunState(
+        status="running",
+        operation="sequence",
+        state="Cycle_moveToPlace",
+        step="Moving to destination",
+        robot_position=Position(x=10, y=20, z=30),
+        gripper="closed",
+        fault="",
+        updated_at="2026-01-01T00:00:00+00:00",
+    )
+    repository.save(run_state)
+    assert repository.load() == run_state
+
+    database._ENGINE = None
+    database._DATABASE_URL = url
+    restarted = SqliteRunStateRepository(url)
+    assert restarted.load() == run_state
+
+
+def test_in_memory_run_state_round_trip() -> None:
+    repository = InMemoryRunStateRepository()
+    assert repository.load() is None
+    run_state = RunState(status="idle", gripper="closed")
+    repository.save(run_state)
+    assert repository.load() == run_state
+    assert repository.saved == [run_state]

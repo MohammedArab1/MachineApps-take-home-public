@@ -11,7 +11,7 @@ from app import api
 from app import main as main_module
 from app.machine import PickAndPlaceMachine
 from app.models import DEFAULT_CONFIG
-from app.repository import InMemoryConfigRepository
+from app.repository import InMemoryConfigRepository, InMemoryRunStateRepository
 from app.service import GantryService
 from tests.conftest import FakeRobot, FakeTelemetry
 
@@ -35,6 +35,7 @@ async def api_client(fast_settings):
         machine,
         InMemoryConfigRepository(DEFAULT_CONFIG),
         fast_settings,
+        run_state_repository=InMemoryRunStateRepository(),
         telemetry=FakeTelemetry(),
     )
     api.bind(service)
@@ -285,3 +286,38 @@ async def test_safe_command_catches_unexpected_errors() -> None:
     result = await api._safe_command(boom)
     assert result.ok is False
     assert "explode" in result.message
+
+
+async def test_jog_robot(api_client) -> None:
+    client, service, robot = api_client
+    response = await post(client, "JogRobot", {"axis": "x", "delta": 10})
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert response.json()["status"]["state"] == "Manual_move"
+    await wait_done(service.machine)
+    assert robot.current_position == [10.0, 0.0, 0.0]
+
+
+async def test_jog_robot_rejects_out_of_limits(api_client) -> None:
+    client, service, _ = api_client
+    response = await post(client, "JogRobot", {"axis": "x", "delta": 2000})
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is False
+    assert "within" in response.json()["message"]
+    assert service.machine.state == "ready"
+
+
+async def test_manual_gripper_actions(api_client) -> None:
+    client, _, robot = api_client
+
+    close = await post(client, "CloseGripper")
+    assert close.json()["ok"] is True
+    assert close.json()["status"]["gripper"] == "closed"
+    assert robot.gripper == "closed"
+
+    opened = await post(client, "OpenGripper")
+    assert opened.json()["ok"] is True
+    assert opened.json()["status"]["gripper"] == "open"
+    assert robot.gripper == "open"

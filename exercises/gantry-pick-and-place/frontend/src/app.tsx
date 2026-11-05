@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
+  closeGripper,
   homeRobot,
+  jogRobot,
   openEvents,
+  openGripper,
   openStatus,
   recentEvents as fetchRecentEvents,
   resetRobot,
@@ -20,6 +23,7 @@ import {
 } from "./components/Banners";
 import { ConfigForm } from "./components/ConfigForm";
 import { ControlPanel } from "./components/ControlPanel";
+import { ManualPanel } from "./components/ManualPanel";
 import { SceneView } from "./components/SceneView";
 import { TelemetryPanel } from "./components/TelemetryPanel";
 import { mergeEvents } from "./lib/events";
@@ -201,6 +205,20 @@ export function App() {
             onStop={() => void runCommand("stop", stopSequence)}
             onReset={() => void runCommand("reset", resetRobot)}
             onSimulateFault={() => void runCommand("fault", simulateFault)}
+          />
+          <ManualPanel
+            status={status}
+            connected={connected}
+            pending={pending}
+            onJog={(axis, delta) =>
+              void runCommand(`jog-${axis}`, () => jogRobot(axis, delta))
+            }
+            onOpenGripper={() =>
+              void runCommand("open-gripper", openGripper)
+            }
+            onCloseGripper={() =>
+              void runCommand("close-gripper", closeGripper)
+            }
           />
           <ConfigForm
             config={status.config}

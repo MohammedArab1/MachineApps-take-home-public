@@ -16,6 +16,7 @@ from communication.decorators import action
 from app.models import (
     ActionResult,
     EventList,
+    JogRobotRequest,
     MachineConfig,
     MoveRobotRequest,
     RobotState,
@@ -44,7 +45,7 @@ async def _safe_command(
     service = get_service()
     try:
         return await command()
-    except Exception as exc:  # noqa: BLE001 - never leak an opaque error envelope
+    except Exception as exc:  # noqa: BLE001
         return ActionResult(
             ok=False,
             message=str(exc) or exc.__class__.__name__,
@@ -77,6 +78,24 @@ async def get_robot_position() -> RobotState:
 async def set_robot_position(request: MoveRobotRequest) -> ActionResult:
     service = get_service()
     return await _safe_command(lambda: service.move_robot(request))
+
+
+@action("JogRobot")
+async def jog_robot(request: JogRobotRequest) -> ActionResult:
+    service = get_service()
+    return await _safe_command(lambda: service.jog_robot(request))
+
+
+@action("OpenGripper")
+async def open_gripper() -> ActionResult:
+    service = get_service()
+    return await _safe_command(service.open_gripper)
+
+
+@action("CloseGripper")
+async def close_gripper() -> ActionResult:
+    service = get_service()
+    return await _safe_command(service.close_gripper)
 
 
 @action("HomeRobot")

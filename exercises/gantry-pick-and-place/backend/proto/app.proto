@@ -56,6 +56,11 @@ message MoveRobotRequest {
   Position position = 1;
 }
 
+message JogRobotRequest {
+  string axis = 1;
+  double delta = 2;
+}
+
 message Event {
   int32 id = 1;
   string timestamp = 2;
@@ -74,6 +79,9 @@ service GantryPickAndPlaceService {
   rpc SetConfig (SetConfigRequest) returns (ActionResult);
   rpc GetRobotPosition (google.protobuf.Empty) returns (RobotState);
   rpc SetRobotPosition (MoveRobotRequest) returns (ActionResult);
+  rpc JogRobot (JogRobotRequest) returns (ActionResult);
+  rpc OpenGripper (google.protobuf.Empty) returns (ActionResult);
+  rpc CloseGripper (google.protobuf.Empty) returns (ActionResult);
   rpc HomeRobot (google.protobuf.Empty) returns (ActionResult);
   rpc StartSequence (google.protobuf.Empty) returns (ActionResult);
   rpc StopSequence (google.protobuf.Empty) returns (ActionResult);
