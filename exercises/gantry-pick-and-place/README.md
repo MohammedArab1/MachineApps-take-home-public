@@ -19,6 +19,13 @@ The frontend uses the TypeScript client generated from the proto emitted by
 
 ![Dashboard showing the cell view, telemetry, controls, configuration, and activity log](docs/dashboard.png)
 
+## Demo
+
+A silent, captioned 140-second walkthrough is available as
+[MP4](docs/demo.mp4), [WebM](docs/demo.webm), or [GIF](docs/demo.gif). It shows
+the modeled cube following the gripper from Table A to Table B, the longer step
+pauses, manual controls, and fault recovery.
+
 ---
 
 ## Quick start
@@ -65,12 +72,12 @@ development flow.
 ### Tests and checks
 
 ```bash
-# backend: 154 tests, 99.9% coverage, ruff
+# backend: 180 tests, ~96% coverage, ruff
 cd backend
 .venv/bin/ruff check app tests
 .venv/bin/pytest --cov=app --cov-report=term-missing
 
-# frontend: 81 tests, ~95% coverage, lint, typecheck, build
+# frontend: 93 tests, ~95% coverage, lint, typecheck, build
 cd frontend
 npm run lint
 npm run typecheck
@@ -91,18 +98,20 @@ make build
 ## What the dashboard does
 
 - **Live telemetry** from the `Status` stream: robot X/Y/Z, gripper state,
-  moving/idle, raw state-machine state, friendly step, cycle progress, and the
-  configured cube/destination/home positions.
+  moving/idle, raw state-machine state, friendly step, cycle progress, cube
+  location and live position, and the configured cube/destination/home
+  positions.
 - **Cell view**: an SVG plan view of the 2 m × 2 m footprint with Table A,
-  Table B, the robot base and current position, the cube, the destination, and
-  a vertical Z gauge.
+  Table B, the robot base and current position, the modeled cube, the
+  destination, and a vertical Z gauge. The cube follows the gripper while it is
+  held.
 - **Controls**: Home, Start, Stop, and Reset, plus a **Manual control** panel
   with X/Y/Z jogs and open/close gripper. Motion commands are enabled only when
   the robot is idle and not faulted; Stop remains available while an operation
   is running, even if the telemetry stream drops. Manual commands are rejected
   by the backend and disabled in the UI while the crane is moving or faulted.
-  Start is also disabled while the gripper is closed; open it in Manual control
-  first.
+  Start is also disabled while the gripper is closed or the cube is not on
+  Table A; open the gripper or return the cube in Manual control first.
 - **Configuration**: cube start, destination, home, speed, and approach height.
   The form validates locally and the server validates again. Configuration is
   persisted through `vention-storage`.
@@ -204,7 +213,17 @@ stateDiagram-v2
 | Open gripper | — |
 | Lift from destination | `(dest.x, dest.y, dest.z + approachHeight)` → `ready` |
 
-The sequence ends lifted above the destination. Home is a separate command.
+The sequence ends with the cube on Table B and the robot lifted above it. Home
+is a separate command.
+
+Cube state is tracked independently: it moves from `table_a` to `held` when the
+gripper closes at the pick, and from `held` to `table_b` when the gripper opens
+at the destination. Start is rejected unless the cube is back on Table A;
+`ResetCube` returns it there for another run.
+
+`GANTRY_STEP_PAUSE_S` adds a deliberate pause after every motion or gripper step
+(default `0`; the recorded demo uses `4`). `GANTRY_GRIPPER_SETTLE_S` controls the
+gripper settle delay (default `0.15`).
 
 Each motion state's synchronous `on_enter` callback schedules an async step
 task. The task calls `robot.move_to(...)` repeatedly until the simulator
@@ -228,6 +247,7 @@ All application traffic uses Connect RPC under `/rpc`:
 | `JogRobot` | action | `JogRobotRequest` | `ActionResult` |
 | `OpenGripper` | action | `Empty` | `ActionResult` |
 | `CloseGripper` | action | `Empty` | `ActionResult` |
+| `ResetCube` | action | `Empty` | `ActionResult` |
 | `HomeRobot` | action | `Empty` | `ActionResult` |
 | `StartSequence` | action | `Empty` | `ActionResult` |
 | `StopSequence` | action | `Empty` | `ActionResult` |
@@ -241,8 +261,10 @@ All application traffic uses Connect RPC under `/rpc`:
 machine, not a teleport. `JogRobot` is a relative move along one axis.
 `OpenGripper` and `CloseGripper` are manual gripper commands. All manual
 commands are rejected unless the machine is `ready` and the robot is stopped.
-`StartSequence` is also rejected unless the gripper is open, so a pick cannot
-begin with a closed gripper after a manual close or an interrupted run.
+`ResetCube` returns the simulated cube to Table A and requires an open gripper.
+`StartSequence` is also rejected unless the gripper is open and the cube is on
+Table A, so a pick cannot begin with a closed gripper or a missing cube after a
+manual close, a completed run, or an interrupted run.
 
 Every command returns:
 
@@ -313,7 +335,7 @@ backend/
 │   ├── service.py                # orchestration and command rules
 │   ├── api.py                    # Connect actions
 │   └── main.py                   # wiring, lifespan, proto emission
-└── tests/                        # 154 tests
+└── tests/                        # 180 tests
 ```
 
 ### Frontend layout
@@ -432,16 +454,16 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 
 ### Testing strategy
 
-- **Backend:** 177 tests. A deterministic `FakeRobot` exercises the state
+- **Backend:** 180 tests. A deterministic `FakeRobot` exercises the state
   machine without sleeping; the real simulator adapter is tested with a patched
   clock; the SQLite repositories are tested with a temporary database and a
   simulated restart; the Connect actions are exercised through the real ASGI
   app; a real uvicorn subprocess verifies the stream framing; the proto is
-  checked against the Python surface. Coverage is ~98.6% of `app/`.
-- **Frontend:** 89 tests with Vitest + React Testing Library. Scene math,
+  checked against the Python surface. Coverage is ~96.5% of `app/`.
+- **Frontend:** 93 tests with Vitest + React Testing Library. Scene math,
   validation, event merging, every component state, the manual panel, the
   stream hook's reconnect/stall/unmount behavior, and the app's loading/
-  connected/fault/disconnected flows. Coverage is ~95.8%.
+  connected/fault/disconnected flows. Coverage is ~94.8%.
 - **CI:** GitHub Actions runs backend lint/tests/proto check and frontend
   lint/typecheck/coverage/build on every push and pull request.
 
@@ -449,7 +471,10 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 
 - This is a simulation: no real hardware, collision detection, inverse
   kinematics, or safety PLC.
-- The cube is represented by its pick point; its physical size is not modelled.
+- The cube is modeled as a simple stateful object (`table_a`, `held`, `table_b`,
+  `unknown`) and drawn at the configured pick point or the live gripper
+  position. Its physical dimensions, rotation, and collision volume are not
+  simulated.
 - The table geometry is a visual reference. Motion targets come from the
   configured cube and destination points, not from the table polygons, so the
   table placement does not affect the control logic. The defaults are the
@@ -457,9 +482,10 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 - The run state is persisted, but motion is never auto-resumed. An interrupted
   operation comes up in `fault` and requires Reset. A real machine additionally
   needs an explicit re-home and hardware safety checks.
-- Start requires an open gripper. A closed gripper can be opened in Manual
-  control. This prevents starting a pick with the gripper already closed after a
-  manual close or an interrupted run.
+- Start requires an open gripper and the cube on Table A. A closed gripper can
+  be opened and the cube returned in Manual control. This prevents starting a
+  pick with the gripper already closed or the cube already placed after a
+  manual command, a completed run, or an interrupted run.
 - Manual jog and gripper commands require the machine to be `ready` and the
   robot to be stopped. Jogs use the configured speed, limits, and motion
   timeout.
@@ -478,9 +504,12 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 2. Open the dashboard. The robot starts at home `(0, 0, 0)`; the cube is at
    Table A and the destination at Table B.
 3. Click **Start sequence**. Watch the state badge, step label, X/Y/Z readouts,
-   scene markers, and progress bar advance through the eight steps.
-4. The sequence ends lifted above Table B. Click **Home robot** to return.
-5. Edit the cube or destination coordinates and click **Save configuration**.
+   scene markers, cube location, and progress bar advance through the eight
+   steps. The cube follows the gripper ring while it is held.
+4. The sequence ends with the cube on Table B and the robot lifted above it.
+   Click **Home robot** to return.
+5. To run again, click **Return cube to Table A**, then **Start sequence**.
+   Edit the cube or destination coordinates and click **Save configuration**.
    Reload the page; the values are restored from SQLite.
 6. Use **Manual control** to jog X/Y/Z by 10, 50, or 100 mm and to open or close
    the gripper. The panel is locked while the robot is moving or faulted.
@@ -501,10 +530,9 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 - [x] Provided `robot_sim.py` used unchanged; `move_to` polled to completion
 - [x] Get/Set robot, cube, destination, home; Home, Start, Get Status
 - [x] Full pick-and-place sequence
+- [x] Modeled cube follows the sequence and can be reset
 - [x] Dashboard telemetry, controls, error/state visuals
 - [x] `vention-storage` persistence across restarts
 - [x] Backend and frontend tests
 - [x] Docker Compose single command
 - [x] README with setup, design decisions, assumptions, trade-offs
-
-The implementation plan and approval record live in `../PLAN.md`.
