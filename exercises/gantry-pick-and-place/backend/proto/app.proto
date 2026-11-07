@@ -87,6 +87,7 @@ service GantryPickAndPlaceService {
   rpc ResetCube (google.protobuf.Empty) returns (ActionResult);
   rpc HomeRobot (google.protobuf.Empty) returns (ActionResult);
   rpc StartSequence (google.protobuf.Empty) returns (ActionResult);
+  rpc ResumeSequence (google.protobuf.Empty) returns (ActionResult);
   rpc StopSequence (google.protobuf.Empty) returns (ActionResult);
   rpc Reset (google.protobuf.Empty) returns (ActionResult);
   rpc RecentEvents (google.protobuf.Empty) returns (EventList);

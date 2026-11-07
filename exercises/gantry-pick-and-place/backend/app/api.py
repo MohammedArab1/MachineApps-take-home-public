@@ -116,6 +116,12 @@ async def start_sequence() -> ActionResult:
     return await _safe_command(service.start_sequence)
 
 
+@action("ResumeSequence")
+async def resume_sequence() -> ActionResult:
+    service = get_service()
+    return await _safe_command(service.resume_sequence)
+
+
 @action("StopSequence")
 async def stop_sequence() -> ActionResult:
     service = get_service()

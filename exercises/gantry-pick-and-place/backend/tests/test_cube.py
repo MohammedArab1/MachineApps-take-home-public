@@ -101,6 +101,63 @@ async def test_reset_cube_requires_an_open_gripper(fast_settings) -> None:
     assert service.status().cube_location == "table_a"
 
 
+async def test_stop_after_pick_can_resume_and_finish(fast_settings) -> None:
+    robot = FakeRobot(complete_after=100)
+    machine = build_machine(robot, fast_settings)
+    service = build_service(
+        robot,
+        machine,
+        fast_settings,
+        InMemoryRunStateRepository(),
+    )
+
+    assert (await service.start_sequence()).ok
+    await wait_for_state(machine, "Cycle_liftFromPick")
+    assert service.status().cube_location == "held"
+    assert service.status().gripper == "closed"
+
+    assert (await service.stop_sequence()).ok
+    assert service.status().state == "ready"
+    assert service.status().cube_location == "held"
+
+    start = await service.start_sequence()
+    assert not start.ok
+    assert "Resume" in start.message
+
+    robot.complete_after = 1
+    robot._target = None  # noqa: SLF001 - deterministic test control
+    robot._remaining = 1  # noqa: SLF001
+    resumed = await service.resume_sequence()
+
+    assert resumed.ok
+    assert resumed.status.state == "Recovery_moveToPlace"
+    await wait_done(machine)
+    status = service.status()
+    assert status.state == "ready"
+    assert status.cube_location == "table_b"
+    assert status.cube_position == DEFAULT_CONFIG.destination_position
+
+
+async def test_resume_requires_a_held_cube(fast_settings) -> None:
+    robot = FakeRobot()
+    machine = build_machine(robot, fast_settings)
+    service = build_service(
+        robot,
+        machine,
+        fast_settings,
+        InMemoryRunStateRepository(),
+    )
+
+    result = await service.resume_sequence()
+    assert not result.ok
+    assert "Only a stopped sequence" in result.message
+
+    assert (await service.close_gripper()).ok
+    result = await service.resume_sequence()
+    assert not result.ok
+    assert "Only a stopped sequence" in result.message
+
+
 async def test_cube_state_survives_restart(fast_settings) -> None:
     robot = FakeRobot()
     machine = build_machine(robot, fast_settings)

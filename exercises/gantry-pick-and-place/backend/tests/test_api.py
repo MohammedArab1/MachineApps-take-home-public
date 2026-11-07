@@ -236,6 +236,38 @@ async def test_stop_sequence(api_client) -> None:
     assert robot.halt_count == 1
 
 
+async def test_resume_sequence_finishes_a_stopped_place(api_client) -> None:
+    client, service, robot = api_client
+    robot.complete_after = 100
+    await post(client, "StartSequence")
+    await wait_for_state(service.machine, "Cycle_liftFromPick")
+
+    stop = await post(client, "StopSequence")
+    assert stop.json()["ok"] is True
+    stopped = (await post(client, "GetStatus")).json()
+    assert stopped["cubeLocation"] == "held"
+    assert stopped["gripper"] == "closed"
+
+    start = await post(client, "StartSequence")
+    assert start.json()["ok"] is False
+    assert "Resume" in start.json()["message"]
+
+    robot.complete_after = 1
+    robot._target = None  # noqa: SLF001 - deterministic test control
+    robot._remaining = 1  # noqa: SLF001
+    response = await post(client, "ResumeSequence")
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert response.json()["status"]["state"] == "Recovery_moveToPlace"
+    await wait_done(service.machine)
+
+    final = (await post(client, "GetStatus")).json()
+    assert final["state"] == "ready"
+    assert final["cubeLocation"] == "table_b"
+    assert robot.current_position == [630.0, -550.0, 100.0]
+
+
 async def test_simulate_fault_and_reset(api_client) -> None:
     client, service, _ = api_client
     fault = await post(client, "SimulateFault")

@@ -40,6 +40,10 @@ class Cycle(StateGroup):
     liftFromPlace: State = State()
 
 
+class Recovery(StateGroup):
+    moveToPlace: State = State()
+
+
 class Homing(StateGroup):
     moveHome: State = State()
 
@@ -50,12 +54,14 @@ class Manual(StateGroup):
 
 class States:
     cycle = Cycle()
+    recovery = Recovery()
     homing = Homing()
     manual = Manual()
 
 
 class Triggers:
     start = Trigger("start")
+    resume = Trigger("resume")
     home = Trigger("home")
     manual = Trigger("manual")
     next = Trigger("next")
@@ -76,12 +82,19 @@ CYCLE_STATES = [
     States.cycle.liftFromPlace,
 ]
 
-ACTIVE_STATES = [*CYCLE_STATES, States.homing.moveHome, States.manual.move]
+ACTIVE_STATES = [
+    *CYCLE_STATES,
+    States.recovery.moveToPlace,
+    States.homing.moveHome,
+    States.manual.move,
+]
 
 TRANSITIONS: list[dict[str, str]] = [
     Triggers.start.transition(BaseStates.READY.value, States.cycle.moveToPick),
+    Triggers.resume.transition(BaseStates.READY.value, States.recovery.moveToPlace),
     Triggers.home.transition(BaseStates.READY.value, States.homing.moveHome),
     Triggers.manual.transition(BaseStates.READY.value, States.manual.move),
+    Triggers.next.transition(States.recovery.moveToPlace, States.cycle.lowerToPlace),
     Triggers.next.transition(States.cycle.moveToPick, States.cycle.lowerToPick),
     Triggers.next.transition(States.cycle.lowerToPick, States.cycle.closeGripper),
     Triggers.next.transition(States.cycle.closeGripper, States.cycle.liftFromPick),
@@ -109,6 +122,7 @@ STEP_LABELS: dict[str, str] = {
     str(States.cycle.lowerToPlace): "Lowering to destination",
     str(States.cycle.openGripper): "Opening gripper",
     str(States.cycle.liftFromPlace): "Lifting from destination",
+    str(States.recovery.moveToPlace): "Resuming to destination",
     str(States.homing.moveHome): "Homing",
     str(States.manual.move): "Manual move",
     BaseStates.READY.value: "Ready",
@@ -118,6 +132,9 @@ STEP_LABELS: dict[str, str] = {
 CYCLE_PROGRESS: dict[str, float] = {
     str(state): (index + 1) / len(CYCLE_STATES) for index, state in enumerate(CYCLE_STATES)
 }
+CYCLE_PROGRESS[str(States.recovery.moveToPlace)] = CYCLE_PROGRESS[
+    str(States.cycle.moveToPlace)
+]
 
 
 class PickAndPlaceMachine(StateMachine):
@@ -170,6 +187,11 @@ class PickAndPlaceMachine(StateMachine):
         self.operation_done.clear()
         return bool(self.trigger(Triggers.start.name))
 
+    def resume_sequence(self, config: MachineConfig) -> bool:
+        self.operation_config = config
+        self.operation_done.clear()
+        return bool(self.trigger(Triggers.resume.name))
+
     def home_robot(self, config: MachineConfig) -> bool:
         self.operation_config = config
         self.operation_done.clear()
@@ -206,6 +228,10 @@ class PickAndPlaceMachine(StateMachine):
 
     @guard(Triggers.start)
     def _guard_start(self) -> bool:
+        return self.state == BaseStates.READY.value and self.operation_config is not None
+
+    @guard(Triggers.resume)
+    def _guard_resume(self) -> bool:
         return self.state == BaseStates.READY.value and self.operation_config is not None
 
     @guard(Triggers.home)
@@ -278,6 +304,10 @@ class PickAndPlaceMachine(StateMachine):
     @on_enter_state(States.cycle.liftFromPlace)
     def _enter_lift_from_place(self, _: Any) -> None:
         self._schedule_motion(self._place_approach(), Triggers.next.name)
+
+    @on_enter_state(States.recovery.moveToPlace)
+    def _enter_recovery_move_to_place(self, _: Any) -> None:
+        self.spawn(self._resume_step(Triggers.next.name))
 
     @on_enter_state(States.homing.moveHome)
     def _enter_homing(self, _: Any) -> None:
@@ -366,6 +396,28 @@ class PickAndPlaceMachine(StateMachine):
             if self.robot.at(home) and not self.robot.moving:
                 return
             await asyncio.sleep(self.poll_interval_s)
+
+    async def _resume_step(self, next_trigger: str) -> None:
+        """Lift the held cube clear, move to the place approach, then continue."""
+
+        try:
+            config = self._require_config()
+            current = self.robot.current_position
+            safe_z = max(
+                current[2],
+                config.cube_position.z + config.approach_height,
+                config.destination_position.z + config.approach_height,
+            )
+            if abs(current[2] - safe_z) > 1e-9:
+                await self._move_to([current[0], current[1], safe_z], config.speed)
+            await self._move_to(self._place_approach(), config.speed)
+            if self.step_pause_s > 0:
+                await asyncio.sleep(self.step_pause_s)
+            self.trigger(next_trigger)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - any step failure must fault
+            self._fail(exc)
 
     async def _motion_step(
         self,

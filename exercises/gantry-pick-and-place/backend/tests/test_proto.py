@@ -30,6 +30,7 @@ def test_proto_contains_the_expected_rpcs() -> None:
         "ResetCube",
         "HomeRobot",
         "StartSequence",
+        "ResumeSequence",
         "StopSequence",
         "Reset",
         "RecentEvents",

@@ -7,6 +7,7 @@ interface ControlPanelProps {
   devTools: boolean;
   onHome: () => void;
   onStart: () => void;
+  onResume: () => void;
   onStop: () => void;
   onReset: () => void;
   onSimulateFault: () => void;
@@ -23,6 +24,7 @@ export function ControlPanel({
   devTools,
   onHome,
   onStart,
+  onResume,
   onStop,
   onReset,
   onSimulateFault,
@@ -30,16 +32,22 @@ export function ControlPanel({
   const busy = status.busy;
   const faulted = status.state === "fault";
   const gripperClosed = status.gripper === "closed";
-  const cubeAtStart = (status.cubeLocation || "table_a") === "table_a";
+  const cubeLocation = status.cubeLocation || "table_a";
+  const cubeAtStart = cubeLocation === "table_a";
+  const cubeHeld = cubeLocation === "held";
+  const resumable = cubeHeld && gripperClosed;
   const commandsBlocked = pending !== null;
 
-  const startDisabled =
-    !connected ||
-    busy ||
-    faulted ||
-    gripperClosed ||
-    !cubeAtStart ||
-    commandsBlocked;
+  const primaryPending = resumable ? "resume" : "start";
+  const primaryLabel = resumable ? "Resume sequence" : "Start sequence";
+  const primaryDisabled = resumable
+    ? !connected || busy || faulted || commandsBlocked
+    : !connected ||
+      busy ||
+      faulted ||
+      gripperClosed ||
+      !cubeAtStart ||
+      commandsBlocked;
   const homeDisabled = !connected || busy || faulted || commandsBlocked;
   const stopDisabled = !busy || commandsBlocked;
   const resetDisabled = !connected || !faulted || commandsBlocked;
@@ -49,11 +57,14 @@ export function ControlPanel({
   if (faulted) hint = "The robot is faulted. Reset before moving.";
   else if (!connected) hint = "Live connection lost. Start and Home are disabled.";
   else if (busy) hint = "An operation is running. Stop is available.";
-  else if (!cubeAtStart) {
-    if (status.cubeLocation === "table_b") {
+  else if (resumable) {
+    hint =
+      "The sequence was stopped with the cube in the gripper. Resume to finish placing it.";
+  } else if (!cubeAtStart) {
+    if (cubeLocation === "table_b") {
       hint = "The cube is on Table B. Return it to Table A first.";
-    } else if (status.cubeLocation === "held") {
-      hint = "The cube is in the gripper. Return it to Table A first.";
+    } else if (cubeHeld) {
+      hint = "The cube is in the gripper. Resume the sequence or return it to Table A.";
     } else {
       hint = "Cube location unknown. Return it to Table A first.";
     }
@@ -74,11 +85,11 @@ export function ControlPanel({
         <button
           type="button"
           className="button button--start"
-          onClick={onStart}
-          disabled={startDisabled}
-          aria-busy={pending === "start"}
+          onClick={resumable ? onResume : onStart}
+          disabled={primaryDisabled}
+          aria-busy={pending === primaryPending}
         >
-          {pendingLabel(pending, "start", "Start sequence")}
+          {pendingLabel(pending, primaryPending, primaryLabel)}
         </button>
         <button
           type="button"

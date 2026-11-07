@@ -295,10 +295,10 @@ class GantryService:
                 return await self._result(False, "An operation is already running")
             if self.robot.moving:
                 return await self._result(False, "The robot is still moving")
-            if self.robot.gripper != "open":
-                return await self._result(False, "Open the gripper before starting the sequence")
             if self._cube_location != CUBE_AT_TABLE_A:
                 return await self._result(False, self._cube_start_message())
+            if self.robot.gripper != "open":
+                return await self._result(False, "Open the gripper before starting the sequence")
             self._active_operation = "sequence"
             if not self.machine.start_sequence(self.config):
                 self._active_operation = ""
@@ -310,6 +310,37 @@ class GantryService:
                 "Picking from Table A and placing on Table B.",
             )
             return await self._result(True, "Sequence started")
+
+    async def resume_sequence(self) -> ActionResult:
+        async with self._lock:
+            if self.machine.faulted:
+                return await self._result(False, "Reset the fault before resuming the sequence")
+            if self.machine.busy:
+                return await self._result(False, "An operation is already running")
+            if self.robot.moving:
+                return await self._result(False, "The robot is still moving")
+            if self._cube_location != CUBE_HELD:
+                return await self._result(
+                    False,
+                    "Only a stopped sequence with the cube in the gripper can be resumed",
+                )
+            if self.robot.gripper != "closed":
+                return await self._result(
+                    False, "Close the gripper before resuming the sequence"
+                )
+            self._active_operation = "sequence"
+            if not self.machine.resume_sequence(self.config):
+                self._active_operation = ""
+                self._save_run_state_safely("idle")
+                return await self._result(
+                    False, f"Cannot resume from state '{self.machine.state}'"
+                )
+            await self.emit_event(
+                "info",
+                "Sequence resumed",
+                "Lifting the held cube, then moving it to Table B.",
+            )
+            return await self._result(True, "Sequence resumed")
 
     async def home_robot(self) -> ActionResult:
         async with self._lock:
@@ -398,7 +429,10 @@ class GantryService:
         if self._cube_location == CUBE_AT_TABLE_B:
             return "The cube is on Table B. Return it to Table A before starting"
         if self._cube_location == CUBE_HELD:
-            return "The cube is in the gripper. Return it to Table A before starting"
+            return (
+                "The sequence was stopped with the cube in the gripper. "
+                "Resume it or return the cube to Table A"
+            )
         return "The cube location is unknown. Return it to Table A before starting"
 
     async def reset_cube(self) -> ActionResult:

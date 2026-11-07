@@ -10,6 +10,7 @@ import {
   recentEvents as fetchRecentEvents,
   resetCube,
   resetRobot,
+  resumeSequence,
   setConfig as sendConfig,
   simulateFault,
   startSequence,
@@ -203,6 +204,7 @@ export function App() {
             devTools={devTools}
             onHome={() => void runCommand("home", homeRobot)}
             onStart={() => void runCommand("start", startSequence)}
+            onResume={() => void runCommand("resume", resumeSequence)}
             onStop={() => void runCommand("stop", stopSequence)}
             onReset={() => void runCommand("reset", resetRobot)}
             onSimulateFault={() => void runCommand("fault", simulateFault)}

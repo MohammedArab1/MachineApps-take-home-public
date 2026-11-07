@@ -72,12 +72,12 @@ development flow.
 ### Tests and checks
 
 ```bash
-# backend: 180 tests, ~96% coverage, ruff
+# backend: 184 tests, ~95.5% coverage, ruff
 cd backend
 .venv/bin/ruff check app tests
 .venv/bin/pytest --cov=app --cov-report=term-missing
 
-# frontend: 93 tests, ~95% coverage, lint, typecheck, build
+# frontend: 97 tests, ~95.5% coverage, lint, typecheck, build
 cd frontend
 npm run lint
 npm run typecheck
@@ -105,13 +105,14 @@ make build
   Table B, the robot base and current position, the modeled cube, the
   destination, and a vertical Z gauge. The cube follows the gripper while it is
   held.
-- **Controls**: Home, Start, Stop, and Reset, plus a **Manual control** panel
-  with X/Y/Z jogs and open/close gripper. Motion commands are enabled only when
-  the robot is idle and not faulted; Stop remains available while an operation
-  is running, even if the telemetry stream drops. Manual commands are rejected
-  by the backend and disabled in the UI while the crane is moving or faulted.
-  Start is also disabled while the gripper is closed or the cube is not on
-  Table A; open the gripper or return the cube in Manual control first.
+- **Controls**: Home, Start/Resume, Stop, and Reset, plus a **Manual control**
+  panel with X/Y/Z jogs and open/close gripper. Motion commands are enabled only
+  when the robot is idle and not faulted; Stop remains available while an
+  operation is running, even if the telemetry stream drops. Manual commands are
+  rejected by the backend and disabled in the UI while the crane is moving or
+  faulted. Start is disabled while the gripper is closed or the cube is not on
+  Table A. If Stop leaves the cube held in the gripper, the primary button
+  becomes **Resume sequence** to finish the placement.
 - **Configuration**: cube start, destination, home, speed, and approach height.
   The form validates locally and the server validates again. Configuration is
   persisted through `vention-storage`.
@@ -174,6 +175,8 @@ The required sequence is modelled as eight explicit leaf states:
 stateDiagram-v2
     [*] --> ready
     ready --> Cycle_moveToPick: start
+    ready --> Recovery_moveToPlace: resume
+    Recovery_moveToPlace --> Cycle_lowerToPlace: next
     Cycle_moveToPick --> Cycle_lowerToPick: next
     Cycle_lowerToPick --> Cycle_closeGripper: next
     Cycle_closeGripper --> Cycle_liftFromPick: next
@@ -197,6 +200,7 @@ stateDiagram-v2
     Cycle_lowerToPlace --> fault: fail
     Cycle_openGripper --> fault: fail
     Cycle_liftFromPlace --> fault: fail
+    Recovery_moveToPlace --> fault: fail
     Homing_moveHome --> fault: fail
     Manual_move --> fault: fail
     fault --> ready: reset
@@ -220,6 +224,13 @@ Cube state is tracked independently: it moves from `table_a` to `held` when the
 gripper closes at the pick, and from `held` to `table_b` when the gripper opens
 at the destination. Start is rejected unless the cube is back on Table A;
 `ResetCube` returns it there for another run.
+
+If **Stop** interrupts the cycle after the pick, the cube remains held and the
+gripper remains closed. **Resume sequence** lifts straight up at the current
+X/Y to a safe travel height, moves to the Table B approach point, then joins the
+normal lower, open, and lift steps. It never re-picks from Table A and never
+drags the cube sideways along a table. If Stop happened before the pick, the
+cube is still on Table A and the normal Start action is available.
 
 `GANTRY_STEP_PAUSE_S` adds a deliberate pause after every motion or gripper step
 (default `0`; the recorded demo uses `4`). `GANTRY_GRIPPER_SETTLE_S` controls the
@@ -250,6 +261,7 @@ All application traffic uses Connect RPC under `/rpc`:
 | `ResetCube` | action | `Empty` | `ActionResult` |
 | `HomeRobot` | action | `Empty` | `ActionResult` |
 | `StartSequence` | action | `Empty` | `ActionResult` |
+| `ResumeSequence` | action | `Empty` | `ActionResult` |
 | `StopSequence` | action | `Empty` | `ActionResult` |
 | `Reset` | action | `Empty` | `ActionResult` |
 | `RecentEvents` | action | `Empty` | `EventList` |
@@ -264,7 +276,9 @@ commands are rejected unless the machine is `ready` and the robot is stopped.
 `ResetCube` returns the simulated cube to Table A and requires an open gripper.
 `StartSequence` is also rejected unless the gripper is open and the cube is on
 Table A, so a pick cannot begin with a closed gripper or a missing cube after a
-manual close, a completed run, or an interrupted run.
+manual close, a completed run, or an interrupted run. `ResumeSequence` is
+accepted only when the machine is ready and a stopped cycle left the cube held
+with the gripper closed; it finishes the place without re-picking.
 
 Every command returns:
 
@@ -335,7 +349,7 @@ backend/
 │   ├── service.py                # orchestration and command rules
 │   ├── api.py                    # Connect actions
 │   └── main.py                   # wiring, lifespan, proto emission
-└── tests/                        # 180 tests
+└── tests/                        # 184 tests
 ```
 
 ### Frontend layout
@@ -454,16 +468,16 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 
 ### Testing strategy
 
-- **Backend:** 180 tests. A deterministic `FakeRobot` exercises the state
+- **Backend:** 184 tests. A deterministic `FakeRobot` exercises the state
   machine without sleeping; the real simulator adapter is tested with a patched
   clock; the SQLite repositories are tested with a temporary database and a
   simulated restart; the Connect actions are exercised through the real ASGI
   app; a real uvicorn subprocess verifies the stream framing; the proto is
-  checked against the Python surface. Coverage is ~96.5% of `app/`.
-- **Frontend:** 93 tests with Vitest + React Testing Library. Scene math,
+  checked against the Python surface. Coverage is ~95.5% of `app/`.
+- **Frontend:** 97 tests with Vitest + React Testing Library. Scene math,
   validation, event merging, every component state, the manual panel, the
   stream hook's reconnect/stall/unmount behavior, and the app's loading/
-  connected/fault/disconnected flows. Coverage is ~94.8%.
+  connected/fault/disconnected flows. Coverage is ~95.5%.
 - **CI:** GitHub Actions runs backend lint/tests/proto check and frontend
   lint/typecheck/coverage/build on every push and pull request.
 
@@ -486,6 +500,10 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
   be opened and the cube returned in Manual control. This prevents starting a
   pick with the gripper already closed or the cube already placed after a
   manual command, a completed run, or an interrupted run.
+- A Stop after the pick leaves the cube held. Resume is an explicit safe
+  recovery: lift at the current X/Y, move to the place approach, and finish the
+  placement. Motion is never auto-resumed, and an interrupted run still starts
+  in `fault` and requires Reset before Resume or any other command.
 - Manual jog and gripper commands require the machine to be `ready` and the
   robot to be stopped. Jogs use the configured speed, limits, and motion
   timeout.
@@ -518,8 +536,10 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
    **Reset fault** to recover.
 8. In local dev, open **Developer tools → Simulate fault** to see the red fault
    banner, then click **Reset fault**.
-9. Click **Stop** during a sequence to halt at the current position; Start is
-   available again afterwards.
+9. Click **Stop** during a sequence to halt at the current position. If the
+   cube was already picked up, the primary button becomes **Resume sequence**;
+   click it to lift clear, move to Table B, and finish placing the cube. If the
+   stop happened before the pick, **Start sequence** remains available.
 
 ---
 
@@ -531,6 +551,7 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 - [x] Get/Set robot, cube, destination, home; Home, Start, Get Status
 - [x] Full pick-and-place sequence
 - [x] Modeled cube follows the sequence and can be reset
+- [x] Safe Resume after Stop with the cube held
 - [x] Dashboard telemetry, controls, error/state visuals
 - [x] `vention-storage` persistence across restarts
 - [x] Backend and frontend tests

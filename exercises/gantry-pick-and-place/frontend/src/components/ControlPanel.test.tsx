@@ -16,6 +16,7 @@ function renderPanel(
     devTools: false,
     onHome: vi.fn(),
     onStart: vi.fn(),
+    onResume: vi.fn(),
     onStop: vi.fn(),
     onReset: vi.fn(),
     onSimulateFault: vi.fn(),
@@ -108,6 +109,63 @@ describe("ControlPanel", () => {
     expect(screen.getByRole("button", { name: "Start sequence" })).toBeDisabled();
     expect(screen.getByTestId("control-hint")).toHaveTextContent(
       "The cube is on Table B. Return it to Table A first.",
+    );
+  });
+
+  it("offers Resume when a stopped sequence is holding the cube", async () => {
+    const user = userEvent.setup();
+    const held = renderPanel(
+      statusFixture({
+        gripper: "closed",
+        cubeLocation: "held",
+        cubePosition: position(-650, 650, 0),
+      }),
+    );
+
+    const resume = screen.getByRole("button", { name: "Resume sequence" });
+    expect(resume).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Start sequence" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("control-hint")).toHaveTextContent(
+      "Resume to finish placing it.",
+    );
+
+    await user.click(resume);
+    expect(held.props.onResume).toHaveBeenCalledOnce();
+    expect(held.props.onStart).not.toHaveBeenCalled();
+  });
+
+  it("shows a pending Resume label", () => {
+    renderPanel(
+      statusFixture({
+        gripper: "closed",
+        cubeLocation: "held",
+        cubePosition: position(-650, 650, 0),
+      }),
+      { pending: "resume" },
+    );
+
+    const resume = screen.getByRole("button", { name: "Resume sequence…" });
+    expect(resume).toBeDisabled();
+    expect(resume).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("keeps Start disabled when the cube is held but the gripper is open", () => {
+    renderPanel(
+      statusFixture({
+        gripper: "open",
+        cubeLocation: "held",
+        cubePosition: position(-650, 650, 0),
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: "Start sequence" })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Resume sequence" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("control-hint")).toHaveTextContent(
+      "Resume the sequence or return it to Table A.",
     );
   });
 

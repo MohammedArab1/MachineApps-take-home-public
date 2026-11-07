@@ -59,6 +59,9 @@ export const homeRobot = () =>
 export const startSequence = () =>
   client.startSequence({}, { timeoutMs: COMMAND_TIMEOUT_MS });
 
+export const resumeSequence = () =>
+  client.resumeSequence({}, { timeoutMs: COMMAND_TIMEOUT_MS });
+
 export const stopSequence = () =>
   client.stopSequence({}, { timeoutMs: COMMAND_TIMEOUT_MS });
 

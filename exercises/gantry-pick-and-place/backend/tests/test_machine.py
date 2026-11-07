@@ -53,6 +53,7 @@ async def wait_for_state(machine: PickAndPlaceMachine, state: str, timeout: floa
 def test_state_names_are_hierarchical_and_parseable() -> None:
     assert str(States.cycle.moveToPick) == "Cycle_moveToPick"
     assert str(States.cycle.liftFromPlace) == "Cycle_liftFromPlace"
+    assert str(States.recovery.moveToPlace) == "Recovery_moveToPlace"
     assert str(States.homing.moveHome) == "Homing_moveHome"
     assert str(States.manual.move) == "Manual_move"
     # The hierarchy separator is "_"; member names must not contain it.
@@ -225,6 +226,45 @@ async def test_stop_cancels_the_sequence_and_allows_a_restart(fast_settings) -> 
     assert machine.state == "ready"
 
 
+async def test_resume_lifts_the_cube_before_moving_to_the_destination(
+    fast_settings,
+) -> None:
+    robot = FakeRobot(complete_after=100)
+    machine = PickAndPlaceMachine(
+        robot,
+        poll_interval_s=0.001,
+        gripper_settle_s=0.0,
+        min_motion_timeout_s=0.2,
+    )
+    assert machine.start_sequence(DEFAULT_CONFIG)
+    await wait_for_state(machine, "Cycle_liftFromPick")
+
+    await machine.cancel_tasks()
+    robot.halt()
+    assert machine.stop_operation()
+    assert machine.state == "ready"
+
+    robot.complete_after = 1
+    robot._target = None  # noqa: SLF001 - deterministic test control
+    robot._remaining = 1  # noqa: SLF001
+    calls_before_resume = len(robot.calls)
+
+    assert machine.resume_sequence(DEFAULT_CONFIG)
+    assert machine.state == "Recovery_moveToPlace"
+    assert machine.step == "Resuming to destination"
+    assert machine.progress == pytest.approx(5 / 8)
+    await wait_done(machine)
+
+    assert machine.state == "ready"
+    resumed_calls = simplified(robot.calls[calls_before_resume:])
+    assert resumed_calls[0] == ("move_to", [-650.0, 650.0, 100.0])
+    assert resumed_calls[1] == ("move_to", [630.0, -550.0, 100.0])
+    assert resumed_calls[2] == ("move_to", [630.0, -550.0, 0.0])
+    assert ("open",) in resumed_calls
+    assert resumed_calls[-1] == ("move_to", [630.0, -550.0, 100.0])
+    assert robot.current_position == [630.0, -550.0, 100.0]
+
+
 async def test_home_uses_the_configured_home(fast_settings) -> None:
     robot = FakeRobot(position=[10.0, 20.0, 30.0])
     machine = PickAndPlaceMachine(
@@ -324,8 +364,10 @@ def test_stop_and_fail_transitions_exist_for_every_active_state(
         triggers = machine.get_triggers(name)
         assert "stop" in triggers
         assert "fail" in triggers
+    assert "stop" in machine.get_triggers("Recovery_moveToPlace")
     assert "stop" in machine.get_triggers("Homing_moveHome")
     assert "stop" in machine.get_triggers("Manual_move")
+    assert "fail" in machine.get_triggers("Recovery_moveToPlace")
     assert "fail" in machine.get_triggers("ready")
     assert "reset" in machine.get_triggers("fault")
 
@@ -333,8 +375,10 @@ def test_stop_and_fail_transitions_exist_for_every_active_state(
 def test_progress_and_step_tables() -> None:
     assert CYCLE_PROGRESS["Cycle_moveToPick"] == pytest.approx(1 / 8)
     assert CYCLE_PROGRESS["Cycle_liftFromPlace"] == pytest.approx(1.0)
+    assert CYCLE_PROGRESS["Recovery_moveToPlace"] == pytest.approx(5 / 8)
     assert STEP_LABELS["Cycle_moveToPick"] == "Moving to cube"
     assert STEP_LABELS["Cycle_lowerToPlace"] == "Lowering to destination"
+    assert STEP_LABELS["Recovery_moveToPlace"] == "Resuming to destination"
     assert STEP_LABELS["Homing_moveHome"] == "Homing"
     assert STEP_LABELS["Manual_move"] == "Manual move"
     assert STEP_LABELS["ready"] == "Ready"

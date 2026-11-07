@@ -9,6 +9,7 @@ import {
   actionResult,
   eventFixture,
   eventList,
+  position,
   statusFixture,
 } from "./test/fixtures";
 
@@ -23,6 +24,7 @@ vi.mock("./client", () => ({
   resetCube: vi.fn(),
   homeRobot: vi.fn(),
   startSequence: vi.fn(),
+  resumeSequence: vi.fn(),
   stopSequence: vi.fn(),
   resetRobot: vi.fn(),
   simulateFault: vi.fn(),
@@ -86,6 +88,9 @@ beforeEach(() => {
   vi.mocked(client.startSequence).mockResolvedValue(
     actionResult(true, "Sequence started"),
   );
+  vi.mocked(client.resumeSequence).mockResolvedValue(
+    actionResult(true, "Sequence resumed"),
+  );
   vi.mocked(client.stopSequence).mockResolvedValue(
     actionResult(true, "Operation stopped"),
   );
@@ -125,6 +130,25 @@ describe("App", () => {
     expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(screen.getByTestId("activity-empty")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start sequence" })).toBeEnabled();
+  });
+
+  it("resumes a stopped sequence with the cube in the gripper", async () => {
+    const user = userEvent.setup();
+    mockStreams(
+      statusFixture({
+        gripper: "closed",
+        cubeLocation: "held",
+        cubePosition: position(-650, 650, 0),
+      }),
+    );
+
+    render(<App />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Resume sequence" }),
+    );
+    expect(client.resumeSequence).toHaveBeenCalledOnce();
+    expect(client.startSequence).not.toHaveBeenCalled();
   });
 
   it("shows the fault banner and resets the fault", async () => {
