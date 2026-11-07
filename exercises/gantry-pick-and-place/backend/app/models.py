@@ -10,6 +10,11 @@ from pydantic.alias_generators import to_camel
 
 ROBOT_LIMIT = 1000.0
 
+CUBE_AT_TABLE_A = "table_a"
+CUBE_HELD = "held"
+CUBE_AT_TABLE_B = "table_b"
+CUBE_UNKNOWN = "unknown"
+
 
 def utc_now_iso() -> str:
     """Return an ISO-8601 UTC timestamp with an explicit timezone."""
@@ -180,6 +185,7 @@ class RunState(BaseModel):
     step: str = "Ready"
     robot_position: Position = Field(default_factory=Position)
     gripper: str = "open"
+    cube_location: str = CUBE_AT_TABLE_A
     fault: str = ""
     updated_at: str = Field(default_factory=utc_now_iso)
 
@@ -213,6 +219,8 @@ class StatusSnapshot(BaseModel):
     step: str = "Ready"
     fault: str = ""
     progress: float = 0.0
+    cube_location: str = CUBE_AT_TABLE_A
+    cube_position: Position = Field(default_factory=Position)
     config: MachineConfig = Field(default_factory=lambda: DEFAULT_CONFIG)
     limits: Position = Field(
         default_factory=lambda: Position(x=ROBOT_LIMIT, y=ROBOT_LIMIT, z=ROBOT_LIMIT)

@@ -27,9 +27,11 @@ message StatusSnapshot {
   string step = 6;
   string fault = 7;
   double progress = 8;
-  MachineConfig config = 9;
-  Position limits = 10;
-  string updated_at = 11;
+  string cube_location = 9;
+  Position cube_position = 10;
+  MachineConfig config = 11;
+  Position limits = 12;
+  string updated_at = 13;
 }
 
 message SetConfigRequest {
@@ -82,6 +84,7 @@ service GantryPickAndPlaceService {
   rpc JogRobot (JogRobotRequest) returns (ActionResult);
   rpc OpenGripper (google.protobuf.Empty) returns (ActionResult);
   rpc CloseGripper (google.protobuf.Empty) returns (ActionResult);
+  rpc ResetCube (google.protobuf.Empty) returns (ActionResult);
   rpc HomeRobot (google.protobuf.Empty) returns (ActionResult);
   rpc StartSequence (google.protobuf.Empty) returns (ActionResult);
   rpc StopSequence (google.protobuf.Empty) returns (ActionResult);

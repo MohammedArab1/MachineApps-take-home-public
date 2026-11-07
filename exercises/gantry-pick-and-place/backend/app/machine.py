@@ -129,6 +129,7 @@ class PickAndPlaceMachine(StateMachine):
         *,
         poll_interval_s: float = 0.02,
         gripper_settle_s: float = 0.15,
+        step_pause_s: float = 0.0,
         min_motion_timeout_s: float = 5.0,
         motion_timeout_factor: float = 3.0,
         motion_timeout_margin_s: float = 2.0,
@@ -142,6 +143,7 @@ class PickAndPlaceMachine(StateMachine):
         self.robot = robot
         self.poll_interval_s = poll_interval_s
         self.gripper_settle_s = gripper_settle_s
+        self.step_pause_s = step_pause_s
         self.min_motion_timeout_s = min_motion_timeout_s
         self.motion_timeout_factor = motion_timeout_factor
         self.motion_timeout_margin_s = motion_timeout_margin_s
@@ -156,6 +158,8 @@ class PickAndPlaceMachine(StateMachine):
         self.operation_done.set()
         # Optional synchronous hook used by the service to persist run state.
         self.state_listener: Callable[[str, str, str], None] | None = None
+        # Optional hook called after a sequence gripper action succeeds.
+        self.gripper_listener: Callable[[str], None] | None = None
 
     # ------------------------------------------------------------------
     # Public commands (the service calls these after its own checks)
@@ -376,6 +380,8 @@ class PickAndPlaceMachine(StateMachine):
                 await self._move_home(target, speed)
             else:
                 await self._move_to(target, speed)
+            if self.step_pause_s > 0:
+                await asyncio.sleep(self.step_pause_s)
             self.trigger(next_trigger)
         except asyncio.CancelledError:
             raise
@@ -388,7 +394,14 @@ class PickAndPlaceMachine(StateMachine):
                 self.robot.close_gripper()
             else:
                 self.robot.open_gripper()
+            if self.gripper_listener is not None:
+                try:
+                    self.gripper_listener("closed" if close else "open")
+                except Exception:  # noqa: BLE001 - cube bookkeeping must not break motion
+                    logger.exception("Gripper listener failed")
             await asyncio.sleep(self.gripper_settle_s)
+            if self.step_pause_s > 0:
+                await asyncio.sleep(self.step_pause_s)
             self.trigger(next_trigger)
         except asyncio.CancelledError:
             raise

@@ -23,7 +23,11 @@ from storage.bootstrap import bootstrap
 from app import api
 from app.config import Settings
 from app.machine import PickAndPlaceMachine
-from app.repository import SqliteConfigRepository, SqliteRunStateRepository
+from app.repository import (
+    SqliteConfigRepository,
+    SqliteRunStateRepository,
+    ensure_run_state_columns,
+)
 from app.robot import SimRobotDriver
 from app.service import GantryService
 from app.telemetry import Telemetry
@@ -77,6 +81,7 @@ bootstrap(
     max_records_per_model=None,
     enable_db_router=False,
 )
+ensure_run_state_columns()
 
 initial_config = repository.load()
 robot = SimRobotDriver(
@@ -89,6 +94,7 @@ machine = PickAndPlaceMachine(
     robot,
     poll_interval_s=settings.poll_interval_s,
     gripper_settle_s=settings.gripper_settle_s,
+    step_pause_s=settings.step_pause_s,
     min_motion_timeout_s=settings.min_motion_timeout_s,
     motion_timeout_factor=settings.motion_timeout_factor,
     motion_timeout_margin_s=settings.motion_timeout_margin_s,

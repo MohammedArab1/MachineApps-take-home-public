@@ -50,6 +50,9 @@ export const openGripper = () =>
 export const closeGripper = () =>
   client.closeGripper({}, { timeoutMs: COMMAND_TIMEOUT_MS });
 
+export const resetCube = () =>
+  client.resetCube({}, { timeoutMs: COMMAND_TIMEOUT_MS });
+
 export const homeRobot = () =>
   client.homeRobot({}, { timeoutMs: COMMAND_TIMEOUT_MS });
 

@@ -343,10 +343,45 @@ button:disabled {
   stroke-width: 1.5;
 }
 
-.scene-cube {
-  fill: var(--orange);
-  stroke: #fed7aa;
-  stroke-width: 1.2;
+.scene-robot-ring {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.55));
+}
+
+.scene-cube-shadow {
+  fill: rgba(2, 6, 23, 0.55);
+}
+
+.scene-cube-face {
+  stroke: rgba(255, 237, 213, 0.85);
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+}
+
+.scene-cube-face--top {
+  fill: #fb923c;
+}
+
+.scene-cube-face--left {
+  fill: #c2410c;
+}
+
+.scene-cube-face--right {
+  fill: #ea580c;
+}
+
+.scene-cube-edge {
+  fill: none;
+  stroke: rgba(255, 237, 213, 0.55);
+  stroke-width: 0.8;
+  stroke-linecap: round;
+}
+
+.scene-cube-group--held .scene-cube-face {
+  filter: drop-shadow(0 0 5px rgba(251, 146, 60, 0.85));
 }
 
 .scene-destination {
@@ -1113,4 +1148,29 @@ button:disabled {
   color: var(--amber);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.cube-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.cube-control > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cube-control span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.cube-control strong {
+  font-size: 13px;
 }

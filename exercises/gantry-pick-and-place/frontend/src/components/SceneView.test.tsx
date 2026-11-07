@@ -8,6 +8,13 @@ function numericAttribute(element: HTMLElement, name: string): number {
   return Number(element.getAttribute(name));
 }
 
+function translateAttribute(element: HTMLElement): { x: number; y: number } {
+  const match = /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(
+    element.getAttribute("transform") ?? "",
+  );
+  return { x: Number(match?.[1]), y: Number(match?.[2]) };
+}
+
 describe("SceneView", () => {
   it("places the robot, cube, destination, and Z marker", () => {
     render(
@@ -23,9 +30,10 @@ describe("SceneView", () => {
     expect(numericAttribute(robot, "cx")).toBeCloseTo(320);
     expect(numericAttribute(robot, "cy")).toBeCloseTo(320);
 
-    const cube = screen.getByTestId("scene-cube");
-    expect(numericAttribute(cube, "x") + 8).toBeCloseTo(140.6);
-    expect(numericAttribute(cube, "y") + 8).toBeCloseTo(140.6);
+    const cube = translateAttribute(screen.getByTestId("scene-cube"));
+    expect(cube.x).toBeCloseTo(140.6);
+    expect(cube.y).toBeCloseTo(140.6);
+    expect(screen.getByTestId("scene-cube-label")).toHaveTextContent("Cube");
 
     const destination = screen.getByTestId("scene-destination");
     expect(numericAttribute(destination, "cx")).toBeCloseTo(493.88);
@@ -41,6 +49,26 @@ describe("SceneView", () => {
     expect(screen.getByRole("img")).toHaveAttribute(
       "aria-label",
       expect.stringContaining("Robot at X 0.0"),
+    );
+  });
+
+  it("draws the cube as a solid object at its live position", () => {
+    render(
+      <SceneView
+        status={statusFixture({
+          robotPosition: position(320, -180, 140),
+          cubePosition: position(320, -180, 140),
+          cubeLocation: "held",
+          config: configFixture(),
+        })}
+      />,
+    );
+
+    const cube = translateAttribute(screen.getByTestId("scene-cube"));
+    expect(cube.x).toBeCloseTo(408.32);
+    expect(cube.y).toBeCloseTo(369.68);
+    expect(screen.getByTestId("scene-cube-label")).toHaveTextContent(
+      "Cube (held)",
     );
   });
 

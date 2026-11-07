@@ -20,6 +20,7 @@ vi.mock("./client", () => ({
   jogRobot: vi.fn(),
   openGripper: vi.fn(),
   closeGripper: vi.fn(),
+  resetCube: vi.fn(),
   homeRobot: vi.fn(),
   startSequence: vi.fn(),
   stopSequence: vi.fn(),
@@ -75,6 +76,9 @@ beforeEach(() => {
   );
   vi.mocked(client.closeGripper).mockResolvedValue(
     actionResult(true, "Gripper closed"),
+  );
+  vi.mocked(client.resetCube).mockResolvedValue(
+    actionResult(true, "Cube returned to Table A"),
   );
   vi.mocked(client.homeRobot).mockResolvedValue(
     actionResult(true, "Homing started"),

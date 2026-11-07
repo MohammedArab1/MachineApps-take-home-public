@@ -30,10 +30,16 @@ export function ControlPanel({
   const busy = status.busy;
   const faulted = status.state === "fault";
   const gripperClosed = status.gripper === "closed";
+  const cubeAtStart = (status.cubeLocation || "table_a") === "table_a";
   const commandsBlocked = pending !== null;
 
   const startDisabled =
-    !connected || busy || faulted || gripperClosed || commandsBlocked;
+    !connected ||
+    busy ||
+    faulted ||
+    gripperClosed ||
+    !cubeAtStart ||
+    commandsBlocked;
   const homeDisabled = !connected || busy || faulted || commandsBlocked;
   const stopDisabled = !busy || commandsBlocked;
   const resetDisabled = !connected || !faulted || commandsBlocked;
@@ -43,7 +49,17 @@ export function ControlPanel({
   if (faulted) hint = "The robot is faulted. Reset before moving.";
   else if (!connected) hint = "Live connection lost. Start and Home are disabled.";
   else if (busy) hint = "An operation is running. Stop is available.";
-  else if (gripperClosed) hint = "Open the gripper before starting the sequence.";
+  else if (!cubeAtStart) {
+    if (status.cubeLocation === "table_b") {
+      hint = "The cube is on Table B. Return it to Table A first.";
+    } else if (status.cubeLocation === "held") {
+      hint = "The cube is in the gripper. Return it to Table A first.";
+    } else {
+      hint = "Cube location unknown. Return it to Table A first.";
+    }
+  } else if (gripperClosed) {
+    hint = "Open the gripper before starting the sequence.";
+  }
 
   return (
     <section className="panel controls" aria-labelledby="controls-heading">

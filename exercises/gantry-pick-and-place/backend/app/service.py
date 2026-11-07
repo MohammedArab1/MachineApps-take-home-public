@@ -12,6 +12,10 @@ from pydantic import ValidationError
 from app.config import Settings
 from app.machine import PickAndPlaceMachine
 from app.models import (
+    CUBE_AT_TABLE_A,
+    CUBE_AT_TABLE_B,
+    CUBE_HELD,
+    CUBE_UNKNOWN,
     DEFAULT_CONFIG,
     ActionResult,
     Event,
@@ -66,8 +70,10 @@ class GantryService:
         self._event_id = 0
         self._lock = asyncio.Lock()
         self._active_operation = ""
+        self._cube_location = CUBE_AT_TABLE_A
 
         self.machine.state_listener = self._on_state_change
+        self.machine.gripper_listener = self._on_gripper_change
         self._restore_run_state()
 
     # ------------------------------------------------------------------
@@ -84,6 +90,8 @@ class GantryService:
             step=self.machine.step,
             fault=self.machine.fault_message,
             progress=self.machine.progress,
+            cube_location=self._cube_location,
+            cube_position=self._cube_position(),
             config=self.config,
             limits=Position.from_list(self.robot.limits),
             updated_at=utc_now_iso(),
@@ -98,6 +106,13 @@ class GantryService:
 
     def get_config(self) -> MachineConfig:
         return self.config
+
+    def _cube_position(self) -> Position:
+        if self._cube_location == CUBE_AT_TABLE_A:
+            return self.config.cube_position
+        if self._cube_location == CUBE_AT_TABLE_B:
+            return self.config.destination_position
+        return Position.from_list(self.robot.current_position)
 
     async def recent_events(self) -> EventList:
         return EventList(events=list(reversed(self._recent_events)))
@@ -119,6 +134,7 @@ class GantryService:
             self._save_run_state_safely("idle")
             return
 
+        self._cube_location = persisted.cube_location or CUBE_AT_TABLE_A
         if persisted.gripper == "closed":
             self.robot.close_gripper()
         else:
@@ -160,6 +176,25 @@ class GantryService:
         except Exception:
             logger.exception("Could not persist the run state")
 
+    def _on_gripper_change(self, state: str) -> None:
+        try:
+            if (
+                state == "closed"
+                and self.machine.state == "Cycle_closeGripper"
+                and self._cube_location == CUBE_AT_TABLE_A
+            ):
+                self._cube_location = CUBE_HELD
+                self._save_run_state("running")
+            elif (
+                state == "open"
+                and self.machine.state == "Cycle_openGripper"
+                and self._cube_location == CUBE_HELD
+            ):
+                self._cube_location = CUBE_AT_TABLE_B
+                self._save_run_state("running")
+        except Exception:
+            logger.exception("Could not update the cube state")
+
     def _save_run_state(self, status: str) -> None:
         run_state = RunState(
             status=status,
@@ -168,6 +203,7 @@ class GantryService:
             step=self.machine.step,
             robot_position=Position.from_list(self.robot.current_position),
             gripper=self.robot.gripper,
+            cube_location=self._cube_location,
             fault=self.machine.fault_message,
             updated_at=utc_now_iso(),
         )
@@ -261,6 +297,8 @@ class GantryService:
                 return await self._result(False, "The robot is still moving")
             if self.robot.gripper != "open":
                 return await self._result(False, "Open the gripper before starting the sequence")
+            if self._cube_location != CUBE_AT_TABLE_A:
+                return await self._result(False, self._cube_start_message())
             self._active_operation = "sequence"
             if not self.machine.start_sequence(self.config):
                 self._active_operation = ""
@@ -356,6 +394,30 @@ class GantryService:
             )
             return await self._result(True, "Manual jog started")
 
+    def _cube_start_message(self) -> str:
+        if self._cube_location == CUBE_AT_TABLE_B:
+            return "The cube is on Table B. Return it to Table A before starting"
+        if self._cube_location == CUBE_HELD:
+            return "The cube is in the gripper. Return it to Table A before starting"
+        return "The cube location is unknown. Return it to Table A before starting"
+
+    async def reset_cube(self) -> ActionResult:
+        async with self._lock:
+            if self.machine.faulted:
+                return await self._result(False, "Reset the fault before resetting the cube")
+            if self.machine.busy or self.robot.moving:
+                return await self._result(False, "Stop the robot before resetting the cube")
+            if self.robot.gripper != "open":
+                return await self._result(False, "Open the gripper before resetting the cube")
+            self._cube_location = CUBE_AT_TABLE_A
+            self._save_run_state_safely("idle")
+            await self.emit_event(
+                "info",
+                "Cube returned to Table A",
+                "Simulation reset of the cube position.",
+            )
+            return await self._result(True, "Cube returned to Table A")
+
     async def open_gripper(self) -> ActionResult:
         return await self._set_gripper("open")
 
@@ -372,6 +434,12 @@ class GantryService:
             already = self.robot.gripper == state
             if state == "open":
                 self.robot.open_gripper()
+                if self._cube_location == CUBE_HELD:
+                    destination = self.config.destination_position.to_list()
+                    distance = max(
+                        abs(self.robot.current_position[i] - destination[i]) for i in range(3)
+                    )
+                    self._cube_location = CUBE_AT_TABLE_B if distance <= 2.0 else CUBE_UNKNOWN
             else:
                 self.robot.close_gripper()
             self._active_operation = ""

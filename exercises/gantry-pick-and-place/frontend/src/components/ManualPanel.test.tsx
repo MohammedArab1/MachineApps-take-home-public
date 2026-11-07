@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { ManualPanel } from "./ManualPanel";
-import { statusFixture } from "../test/fixtures";
+import { position, statusFixture } from "../test/fixtures";
 
 function renderPanel(
   status = statusFixture(),
@@ -16,6 +16,7 @@ function renderPanel(
     onJog: vi.fn(),
     onOpenGripper: vi.fn(),
     onCloseGripper: vi.fn(),
+    onResetCube: vi.fn(),
     ...overrides,
   };
   const result = render(<ManualPanel {...props} />);
@@ -57,12 +58,45 @@ describe("ManualPanel", () => {
     expect(panel.props.onCloseGripper).toHaveBeenCalledOnce();
 
     panel.unmount();
-    const closed = renderPanel(statusFixture({ gripper: "closed" }));
+    const closed = renderPanel(
+      statusFixture({
+        gripper: "closed",
+        cubeLocation: "held",
+        cubePosition: position(0, 0, 0),
+      }),
+    );
     expect(screen.getByRole("button", { name: "Open gripper" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Close gripper" })).toBeDisabled();
-    expect(screen.getByText(/Moving may carry the cube/)).toBeInTheDocument();
+    expect(screen.getByText(/Moving may carry it/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open gripper" }));
     expect(closed.props.onOpenGripper).toHaveBeenCalledOnce();
+  });
+
+  it("shows the cube state and resets it to Table A", async () => {
+    const user = userEvent.setup();
+    const panel = renderPanel(
+      statusFixture({ cubeLocation: "table_b", cubePosition: position(630, -550, 0) }),
+    );
+
+    expect(screen.getByTestId("manual-cube-location")).toHaveTextContent(
+      "On Table B",
+    );
+    const reset = screen.getByRole("button", {
+      name: "Return cube to Table A",
+    });
+    expect(reset).toBeEnabled();
+    await user.click(reset);
+    expect(panel.props.onResetCube).toHaveBeenCalledOnce();
+  });
+
+  it("disables cube reset when the cube is already at Table A", () => {
+    renderPanel();
+    expect(
+      screen.getByRole("button", { name: "Return cube to Table A" }),
+    ).toBeDisabled();
+    expect(screen.getByTestId("manual-cube-location")).toHaveTextContent(
+      "On Table A",
+    );
   });
 
   it("locks while the robot is moving", () => {

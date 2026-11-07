@@ -98,6 +98,12 @@ async def close_gripper() -> ActionResult:
     return await _safe_command(service.close_gripper)
 
 
+@action("ResetCube")
+async def reset_cube() -> ActionResult:
+    service = get_service()
+    return await _safe_command(service.reset_cube)
+
+
 @action("HomeRobot")
 async def home_robot() -> ActionResult:
     service = get_service()

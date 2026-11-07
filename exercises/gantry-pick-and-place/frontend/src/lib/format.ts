@@ -63,3 +63,11 @@ export function levelTone(level: string): EventTone {
   if (level === "warning") return "warning";
   return "info";
 }
+
+
+export function cubeLocationLabel(location: string): string {
+  if (location === "held") return "In gripper";
+  if (location === "table_b") return "On Table B";
+  if (location === "unknown") return "Unknown";
+  return "On Table A";
+}

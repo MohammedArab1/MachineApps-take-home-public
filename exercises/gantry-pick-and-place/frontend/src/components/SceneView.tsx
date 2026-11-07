@@ -24,9 +24,18 @@ const DEFAULT_POSITION = { x: 0, y: 0, z: 0 };
 
 export function SceneView({ status }: SceneViewProps) {
   const robot = status.robotPosition ?? DEFAULT_POSITION;
-  const cube = status.config?.cubePosition ?? DEFAULT_POSITION;
+  const cube =
+    status.cubePosition ?? status.config?.cubePosition ?? DEFAULT_POSITION;
   const destination = status.config?.destinationPosition ?? DEFAULT_POSITION;
   const approach = status.config?.approachHeight ?? 0;
+  const cubeLabel =
+    status.cubeLocation === "held"
+      ? "Cube (held)"
+      : status.cubeLocation === "table_b"
+        ? "Cube (placed)"
+        : status.cubeLocation === "unknown"
+          ? "Cube?"
+          : "Cube";
 
   const robotPoint = worldToSvg(clampWorld(robot.x), clampWorld(robot.y));
   const cubePoint = worldToSvg(clampWorld(cube.x), clampWorld(cube.y));
@@ -52,7 +61,13 @@ export function SceneView({ status }: SceneViewProps) {
           <p className="panel-subtitle">2 m × 2 m footprint · millimetres</p>
         </div>
         <span className={`scene-legend ${isFault ? "scene-legend--fault" : ""}`}>
-          {isFault ? "Fault" : status.moving ? "In motion" : "Idle"}
+          {isFault
+            ? "Fault"
+            : status.moving
+              ? "In motion"
+              : status.busy
+                ? "Busy"
+                : "Idle"}
         </span>
       </div>
 
@@ -60,7 +75,7 @@ export function SceneView({ status }: SceneViewProps) {
         className={`scene ${isFault ? "scene--fault" : ""}`}
         viewBox={`0 0 ${SCENE_VIEW_WIDTH} ${SCENE_SIZE}`}
         role="img"
-        aria-label={`Top-down cell view. Robot at X ${formatNumber(robot.x)}, Y ${formatNumber(robot.y)}, Z ${formatNumber(robot.z)}. Cube at X ${formatNumber(cube.x)}, Y ${formatNumber(cube.y)}, Z ${formatNumber(cube.z)}. Destination at X ${formatNumber(destination.x)}, Y ${formatNumber(destination.y)}, Z ${formatNumber(destination.z)}.`}
+        aria-label={`Top-down cell view. Robot at X ${formatNumber(robot.x)}, Y ${formatNumber(robot.y)}, Z ${formatNumber(robot.z)}. ${cubeLabel} at X ${formatNumber(cube.x)}, Y ${formatNumber(cube.y)}, Z ${formatNumber(cube.z)}. Destination at X ${formatNumber(destination.x)}, Y ${formatNumber(destination.y)}, Z ${formatNumber(destination.z)}.`}
       >
         <rect
           className="scene-bg"
@@ -169,52 +184,6 @@ export function SceneView({ status }: SceneViewProps) {
         </text>
 
         <circle
-          className="scene-robot-halo"
-          cx={robotPoint.cx}
-          cy={robotPoint.cy}
-          r={18}
-        />
-        <circle
-          className="scene-robot"
-          data-testid="scene-robot"
-          cx={robotPoint.cx}
-          cy={robotPoint.cy}
-          r={9}
-        />
-        <line
-          className="scene-robot-cross"
-          x1={robotPoint.cx - 14}
-          y1={robotPoint.cy}
-          x2={robotPoint.cx + 14}
-          y2={robotPoint.cy}
-        />
-        <line
-          className="scene-robot-cross"
-          x1={robotPoint.cx}
-          y1={robotPoint.cy - 14}
-          x2={robotPoint.cx}
-          y2={robotPoint.cy + 14}
-        />
-
-        <rect
-          className="scene-cube"
-          data-testid="scene-cube"
-          x={cubePoint.cx - 8}
-          y={cubePoint.cy - 8}
-          width={16}
-          height={16}
-          rx={3}
-        />
-        <text
-          className="scene-label scene-label--marker"
-          x={cubePoint.cx}
-          y={cubePoint.cy - 15}
-          textAnchor="middle"
-        >
-          Cube
-        </text>
-
-        <circle
           className="scene-destination"
           data-testid="scene-destination"
           cx={destinationPoint.cx}
@@ -243,6 +212,78 @@ export function SceneView({ status }: SceneViewProps) {
         >
           Destination
         </text>
+
+        <circle
+          className="scene-robot-halo"
+          cx={robotPoint.cx}
+          cy={robotPoint.cy}
+          r={18}
+        />
+        <circle
+          className="scene-robot"
+          data-testid="scene-robot"
+          cx={robotPoint.cx}
+          cy={robotPoint.cy}
+          r={9}
+        />
+        <line
+          className="scene-robot-cross"
+          x1={robotPoint.cx - 14}
+          y1={robotPoint.cy}
+          x2={robotPoint.cx + 14}
+          y2={robotPoint.cy}
+        />
+        <line
+          className="scene-robot-cross"
+          x1={robotPoint.cx}
+          y1={robotPoint.cy - 14}
+          x2={robotPoint.cx}
+          y2={robotPoint.cy + 14}
+        />
+
+        <g
+          className={`scene-cube-group${status.cubeLocation === "held" ? " scene-cube-group--held" : ""}`}
+          data-testid="scene-cube"
+          transform={`translate(${cubePoint.cx} ${cubePoint.cy})`}
+        >
+          <ellipse
+            className="scene-cube-shadow"
+            cx={0}
+            cy={11}
+            rx={11}
+            ry={3.5}
+          />
+          <polygon
+            className="scene-cube-face scene-cube-face--top"
+            points="0,-13 11,-6.5 0,0 -11,-6.5"
+          />
+          <polygon
+            className="scene-cube-face scene-cube-face--left"
+            points="-11,-6.5 0,0 0,11 -11,4.5"
+          />
+          <polygon
+            className="scene-cube-face scene-cube-face--right"
+            points="11,-6.5 0,0 0,11 11,4.5"
+          />
+          <path className="scene-cube-edge" d="M-11 -6.5 L0 0 L11 -6.5 M0 0 L0 11" />
+        </g>
+        <text
+          className="scene-label scene-label--marker"
+          data-testid="scene-cube-label"
+          x={cubePoint.cx}
+          y={cubePoint.cy - 23}
+          textAnchor="middle"
+        >
+          {cubeLabel}
+        </text>
+
+        <circle
+          className="scene-robot-ring"
+          data-testid="scene-robot-ring"
+          cx={robotPoint.cx}
+          cy={robotPoint.cy}
+          r={15}
+        />
 
         <g className="scene-z-gauge" data-testid="scene-z-gauge">
           <text className="scene-label" x={Z_GAUGE.x} y={Z_GAUGE.top - 18} textAnchor="middle">

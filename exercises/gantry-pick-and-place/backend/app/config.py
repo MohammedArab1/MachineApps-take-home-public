@@ -33,6 +33,7 @@ class Settings:
     cors_origins: tuple[str, ...] = _parse_origins(DEFAULT_CORS_ORIGINS)
     poll_interval_s: float = 0.02
     gripper_settle_s: float = 0.15
+    step_pause_s: float = 0.0
     status_idle_heartbeat_s: float = 1.0
     status_active_heartbeat_s: float = 0.1
     min_motion_timeout_s: float = 5.0
@@ -48,6 +49,7 @@ class Settings:
             cors_origins=cors,
             poll_interval_s=float(os.getenv("GANTRY_POLL_INTERVAL_S", "0.02")),
             gripper_settle_s=float(os.getenv("GANTRY_GRIPPER_SETTLE_S", "0.15")),
+            step_pause_s=float(os.getenv("GANTRY_STEP_PAUSE_S", "0.0")),
             status_idle_heartbeat_s=float(os.getenv("GANTRY_STATUS_IDLE_HEARTBEAT_S", "1.0")),
             status_active_heartbeat_s=float(os.getenv("GANTRY_STATUS_ACTIVE_HEARTBEAT_S", "0.1")),
             min_motion_timeout_s=float(os.getenv("GANTRY_MIN_MOTION_TIMEOUT_S", "5.0")),

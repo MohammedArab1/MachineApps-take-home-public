@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { StatusSnapshot } from "../types";
+import { cubeLocationLabel } from "../lib/format";
 
 interface ManualPanelProps {
   status: StatusSnapshot;
@@ -9,6 +10,7 @@ interface ManualPanelProps {
   onJog: (axis: "x" | "y" | "z", delta: number) => void;
   onOpenGripper: () => void;
   onCloseGripper: () => void;
+  onResetCube: () => void;
 }
 
 const JOG_STEPS = [10, 50, 100];
@@ -21,12 +23,15 @@ export function ManualPanel({
   onJog,
   onOpenGripper,
   onCloseGripper,
+  onResetCube,
 }: ManualPanelProps) {
   const [step, setStep] = useState(50);
   const busy = status.busy;
   const faulted = status.state === "fault";
   const locked = !connected || busy || faulted || pending !== null;
   const gripper = status.gripper;
+  const cubeLocation = status.cubeLocation || "table_a";
+  const cubeLabel = cubeLocationLabel(cubeLocation);
 
   let hint = "The robot is idle. Jogs use the configured speed.";
   if (faulted) hint = "Reset the fault before manual control.";
@@ -106,9 +111,24 @@ export function ManualPanel({
         </button>
       </div>
 
-      {gripper === "closed" && (
+      <div className="cube-control">
+        <div>
+          <span>Cube</span>
+          <strong data-testid="manual-cube-location">{cubeLabel}</strong>
+        </div>
+        <button
+          type="button"
+          className="button button--ghost button--small"
+          onClick={onResetCube}
+          disabled={locked || cubeLocation === "table_a" || gripper === "closed"}
+        >
+          Return cube to Table A
+        </button>
+      </div>
+
+      {gripper === "closed" && cubeLocation === "held" && (
         <p className="manual-warning">
-          The gripper is closed. Moving may carry the cube.
+          The cube is held. Moving may carry it.
         </p>
       )}
 

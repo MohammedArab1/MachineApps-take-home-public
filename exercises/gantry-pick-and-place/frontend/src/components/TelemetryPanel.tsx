@@ -1,6 +1,7 @@
 import type { StatusSnapshot } from "../types";
 import {
   formatNumber,
+  cubeLocationLabel,
   formatPercent,
   positionText,
   stateLabel,
@@ -62,6 +63,12 @@ export function TelemetryPanel({ status }: TelemetryPanelProps) {
         <div className="telemetry-row">
           <span>Step</span>
           <strong data-testid="telemetry-step">{status.step}</strong>
+        </div>
+        <div className="telemetry-row">
+          <span>Cube</span>
+          <strong data-testid="telemetry-cube-location">
+            {cubeLocationLabel(status.cubeLocation)}
+          </strong>
         </div>
       </div>
 

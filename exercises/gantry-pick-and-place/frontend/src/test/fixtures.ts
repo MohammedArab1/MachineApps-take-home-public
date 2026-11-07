@@ -47,6 +47,8 @@ export function statusFixture(
       step: "Ready",
       fault: "",
       progress: 0,
+      cubeLocation: "table_a",
+      cubePosition: { x: -650, y: 650, z: 0 },
       config: configFixture(),
       limits: { x: 1000, y: 1000, z: 1000 },
       updatedAt: "2026-11-03T12:00:00+00:00",

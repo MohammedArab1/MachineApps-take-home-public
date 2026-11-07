@@ -14,7 +14,14 @@ from typing import Protocol
 from sqlmodel import Field, SQLModel
 from storage.accessor import ModelAccessor
 
-from app.models import DEFAULT_CONFIG, MachineConfig, Position, RunState, utc_now_iso
+from app.models import (
+    CUBE_AT_TABLE_A,
+    DEFAULT_CONFIG,
+    MachineConfig,
+    Position,
+    RunState,
+    utc_now_iso,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +160,7 @@ class RunStateRow(SQLModel, table=True):
     robot_y: float = 0.0
     robot_z: float = 0.0
     gripper: str = "open"
+    cube_location: str = CUBE_AT_TABLE_A
     fault: str = ""
     updated_at: str = ""
 
@@ -165,6 +173,7 @@ def _row_to_run_state(row: RunStateRow) -> RunState:
         step=row.step,
         robot_position=Position(x=row.robot_x, y=row.robot_y, z=row.robot_z),
         gripper=row.gripper,
+        cube_location=row.cube_location or CUBE_AT_TABLE_A,
         fault=row.fault,
         updated_at=row.updated_at or utc_now_iso(),
     )
@@ -181,6 +190,7 @@ def _run_state_to_row(run_state: RunState) -> RunStateRow:
         robot_y=run_state.robot_position.y,
         robot_z=run_state.robot_position.z,
         gripper=run_state.gripper,
+        cube_location=run_state.cube_location,
         fault=run_state.fault,
         updated_at=run_state.updated_at,
     )
@@ -224,3 +234,24 @@ class InMemoryRunStateRepository:
     def save(self, run_state: RunState) -> None:
         self._run_state = run_state
         self.saved.append(run_state)
+
+
+def ensure_run_state_columns() -> None:
+    """Add the cube_location column to an existing SQLite run-state table."""
+
+    from sqlalchemy import inspect, text
+    from storage.database import get_engine
+
+    engine = get_engine()
+    inspector = inspect(engine)
+    if "gantry_run_state" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("gantry_run_state")}
+    if "cube_location" not in columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE gantry_run_state "
+                    "ADD COLUMN cube_location VARCHAR DEFAULT 'table_a'"
+                )
+            )

@@ -32,6 +32,9 @@ describe("TelemetryPanel", () => {
     expect(screen.getByTestId("telemetry-step")).toHaveTextContent(
       "Lowering to cube",
     );
+    expect(screen.getByTestId("telemetry-cube-location")).toHaveTextContent(
+      "On Table A",
+    );
     expect(screen.getByTestId("telemetry-state-pill")).toHaveTextContent(
       "Lowering to cube",
     );

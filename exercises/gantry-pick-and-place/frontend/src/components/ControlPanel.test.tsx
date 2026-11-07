@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { ControlPanel } from "./ControlPanel";
-import { statusFixture } from "../test/fixtures";
+import { position, statusFixture } from "../test/fixtures";
 
 function renderPanel(
   status = statusFixture(),
@@ -98,6 +98,17 @@ describe("ControlPanel", () => {
 
     renderPanel(statusFixture({ gripper: "open" }));
     expect(screen.getByRole("button", { name: "Start sequence" })).toBeEnabled();
+  });
+
+  it("disables Start when the cube is not at Table A", () => {
+    renderPanel(
+      statusFixture({ cubeLocation: "table_b", cubePosition: position(630, -550, 0) }),
+    );
+
+    expect(screen.getByRole("button", { name: "Start sequence" })).toBeDisabled();
+    expect(screen.getByTestId("control-hint")).toHaveTextContent(
+      "The cube is on Table B. Return it to Table A first.",
+    );
   });
 
   it("invokes the command callbacks", async () => {

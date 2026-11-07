@@ -8,6 +8,7 @@ import {
   openGripper,
   openStatus,
   recentEvents as fetchRecentEvents,
+  resetCube,
   resetRobot,
   setConfig as sendConfig,
   simulateFault,
@@ -218,6 +219,9 @@ export function App() {
             }
             onCloseGripper={() =>
               void runCommand("close-gripper", closeGripper)
+            }
+            onResetCube={() =>
+              void runCommand("reset-cube", resetCube)
             }
           />
           <ConfigForm

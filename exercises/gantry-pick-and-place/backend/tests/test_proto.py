@@ -27,6 +27,7 @@ def test_proto_contains_the_expected_rpcs() -> None:
         "JogRobot",
         "OpenGripper",
         "CloseGripper",
+        "ResetCube",
         "HomeRobot",
         "StartSequence",
         "StopSequence",
