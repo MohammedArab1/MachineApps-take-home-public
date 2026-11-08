@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from app.machine import PickAndPlaceMachine
-from app.models import DEFAULT_CONFIG, Position
+from app.models import CUBE_HELD, DEFAULT_CONFIG, Position
 from app.repository import InMemoryConfigRepository, InMemoryRunStateRepository
 from app.service import GantryService
 from tests.conftest import FakeRobot, FakeTelemetry
@@ -91,12 +91,12 @@ async def test_reset_cube_requires_an_open_gripper(fast_settings) -> None:
         InMemoryRunStateRepository(),
     )
 
-    assert (await service.close_gripper()).ok
+    robot.close_gripper()
     rejected = await service.reset_cube()
     assert not rejected.ok
     assert "Open the gripper" in rejected.message
 
-    assert (await service.open_gripper()).ok
+    robot.open_gripper()
     assert (await service.reset_cube()).ok
     assert service.status().cube_location == "table_a"
 
@@ -152,10 +152,16 @@ async def test_resume_requires_a_held_cube(fast_settings) -> None:
     assert not result.ok
     assert "Only a stopped sequence" in result.message
 
-    assert (await service.close_gripper()).ok
+    robot.close_gripper()
     result = await service.resume_sequence()
     assert not result.ok
     assert "Only a stopped sequence" in result.message
+
+    service._cube_location = CUBE_HELD  # noqa: SLF001 - inconsistent recovery state
+    robot.open_gripper()
+    result = await service.resume_sequence()
+    assert not result.ok
+    assert "Close the gripper" in result.message
 
 
 async def test_cube_state_survives_restart(fast_settings) -> None:

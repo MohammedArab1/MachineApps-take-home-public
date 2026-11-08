@@ -320,50 +320,15 @@ async def test_safe_command_catches_unexpected_errors() -> None:
     assert "explode" in result.message
 
 
-async def test_jog_robot(api_client) -> None:
-    client, service, robot = api_client
-    response = await post(client, "JogRobot", {"axis": "x", "delta": 10})
-
-    assert response.status_code == 200
-    assert response.json()["ok"] is True
-    assert response.json()["status"]["state"] == "Manual_move"
-    await wait_done(service.machine)
-    assert robot.current_position == [10.0, 0.0, 0.0]
-
-
-async def test_jog_robot_rejects_out_of_limits(api_client) -> None:
-    client, service, _ = api_client
-    response = await post(client, "JogRobot", {"axis": "x", "delta": 2000})
-
-    assert response.status_code == 200
-    assert response.json()["ok"] is False
-    assert "within" in response.json()["message"]
-    assert service.machine.state == "ready"
-
-
-async def test_manual_gripper_actions(api_client) -> None:
-    client, _, robot = api_client
-
-    close = await post(client, "CloseGripper")
-    assert close.json()["ok"] is True
-    assert close.json()["status"]["gripper"] == "closed"
-    assert robot.gripper == "closed"
-
-    opened = await post(client, "OpenGripper")
-    assert opened.json()["ok"] is True
-    assert opened.json()["status"]["gripper"] == "open"
-    assert robot.gripper == "open"
-
-
-async def test_start_sequence_rejected_with_closed_gripper(api_client) -> None:
+async def test_start_sequence_opens_a_closed_gripper_at_table_a(api_client) -> None:
     client, service, robot = api_client
     robot.gripper = "closed"
 
     response = await post(client, "StartSequence")
-    assert response.json()["ok"] is False
-    assert "Open the gripper" in response.json()["message"]
-    assert service.machine.state == "ready"
+    assert response.json()["ok"] is True
 
-    assert (await post(client, "OpenGripper")).json()["ok"] is True
-    assert (await post(client, "StartSequence")).json()["ok"] is True
     await wait_done(service.machine)
+    status = (await post(client, "GetStatus")).json()
+    assert status["state"] == "ready"
+    assert status["gripper"] == "open"
+    assert status["cubeLocation"] == "table_b"

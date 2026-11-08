@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 from collections import deque
 
 from pydantic import ValidationError
@@ -15,12 +14,10 @@ from app.models import (
     CUBE_AT_TABLE_A,
     CUBE_AT_TABLE_B,
     CUBE_HELD,
-    CUBE_UNKNOWN,
     DEFAULT_CONFIG,
     ActionResult,
     Event,
     EventList,
-    JogRobotRequest,
     MachineConfig,
     MoveRobotRequest,
     Position,
@@ -298,7 +295,12 @@ class GantryService:
             if self._cube_location != CUBE_AT_TABLE_A:
                 return await self._result(False, self._cube_start_message())
             if self.robot.gripper != "open":
-                return await self._result(False, "Open the gripper before starting the sequence")
+                self.robot.open_gripper()
+                await self.emit_event(
+                    "info",
+                    "Gripper opened",
+                    "The gripper was opened before starting the sequence.",
+                )
             self._active_operation = "sequence"
             if not self.machine.start_sequence(self.config):
                 self._active_operation = ""
@@ -376,54 +378,17 @@ class GantryService:
                 return await self._result(
                     False, "Target position must be within +/-1000 mm on every axis"
                 )
-            self._active_operation = "manual"
+            self._active_operation = "position"
             if not self.machine.manual_move(position.to_list(), self.config.speed):
                 self._active_operation = ""
                 self._save_run_state_safely("idle")
                 return await self._result(False, f"Cannot move from state '{self.machine.state}'")
             await self.emit_event(
                 "info",
-                "Manual move started",
+                "Position move started",
                 f"Target position {position.to_list()}.",
             )
-            return await self._result(True, "Manual move started")
-
-    async def jog_robot(self, request: JogRobotRequest) -> ActionResult:
-        async with self._lock:
-            if self.machine.faulted:
-                return await self._result(False, "Reset the fault before moving")
-            if self.machine.busy:
-                return await self._result(False, "An operation is already running")
-            if self.robot.moving:
-                return await self._result(False, "The robot is still moving")
-
-            axis = request.axis.strip().lower()
-            if axis not in {"x", "y", "z"}:
-                return await self._result(False, "Axis must be x, y, or z")
-            delta = request.delta
-            if not math.isfinite(delta) or delta == 0:
-                return await self._result(False, "Jog delta must be a non-zero number")
-
-            index = {"x": 0, "y": 1, "z": 2}[axis]
-            target = self.robot.current_position
-            target[index] += delta
-            position = Position.from_list(target)
-            if not position.is_within_limits():
-                return await self._result(
-                    False, "Target position must be within +/-1000 mm on every axis"
-                )
-
-            self._active_operation = "manual"
-            if not self.machine.manual_move(position.to_list(), self.config.speed):
-                self._active_operation = ""
-                self._save_run_state_safely("idle")
-                return await self._result(False, f"Cannot move from state '{self.machine.state}'")
-            await self.emit_event(
-                "info",
-                "Manual jog started",
-                f"{axis.upper()} {delta:+g} mm to {position.to_list()}.",
-            )
-            return await self._result(True, "Manual jog started")
+            return await self._result(True, "Position move started")
 
     def _cube_start_message(self) -> str:
         if self._cube_location == CUBE_AT_TABLE_B:
@@ -451,36 +416,6 @@ class GantryService:
                 "Simulation reset of the cube position.",
             )
             return await self._result(True, "Cube returned to Table A")
-
-    async def open_gripper(self) -> ActionResult:
-        return await self._set_gripper("open")
-
-    async def close_gripper(self) -> ActionResult:
-        return await self._set_gripper("closed")
-
-    async def _set_gripper(self, state: str) -> ActionResult:
-        async with self._lock:
-            if self.machine.faulted:
-                return await self._result(False, "Reset the fault before changing the gripper")
-            if self.machine.busy or self.robot.moving:
-                return await self._result(False, "Stop the robot before changing the gripper")
-
-            already = self.robot.gripper == state
-            if state == "open":
-                self.robot.open_gripper()
-                if self._cube_location == CUBE_HELD:
-                    destination = self.config.destination_position.to_list()
-                    distance = max(
-                        abs(self.robot.current_position[i] - destination[i]) for i in range(3)
-                    )
-                    self._cube_location = CUBE_AT_TABLE_B if distance <= 2.0 else CUBE_UNKNOWN
-            else:
-                self.robot.close_gripper()
-            self._active_operation = ""
-            self._save_run_state_safely("idle")
-            message = f"Gripper already {state}" if already else f"Gripper {state}"
-            await self.emit_event("info", message, "Manual gripper command.")
-            return await self._result(True, message)
 
     async def stop_sequence(self) -> ActionResult:
         async with self._lock:

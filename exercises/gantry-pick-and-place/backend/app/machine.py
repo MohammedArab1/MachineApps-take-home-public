@@ -124,7 +124,7 @@ STEP_LABELS: dict[str, str] = {
     str(States.cycle.liftFromPlace): "Lifting from destination",
     str(States.recovery.moveToPlace): "Resuming to destination",
     str(States.homing.moveHome): "Homing",
-    str(States.manual.move): "Manual move",
+    str(States.manual.move): "Moving to position",
     BaseStates.READY.value: "Ready",
     BaseStates.FAULT.value: "Fault",
 }

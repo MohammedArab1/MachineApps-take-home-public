@@ -1074,103 +1074,32 @@ button:disabled {
   }
 }
 
-/* ---------------------------------------------------------- manual control */
+/* ---------------------------------------------------------------- cube panel */
 
-.manual-state {
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: var(--green-soft);
-  color: var(--green);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+.cube-panel .button {
+  width: 100%;
 }
 
-.manual-state--locked {
-  background: var(--amber-soft);
-  color: var(--amber);
-}
-
-.manual-toolbar {
+.cube-state {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.manual-toolbar select {
-  min-height: 40px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
   border-radius: 8px;
   background: #0a1424;
-  color: var(--text);
+}
+
+.cube-state span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.cube-state strong {
   font-size: 13px;
 }
 
-.jog-grid {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.jog-row {
-  display: grid;
-  grid-template-columns: 28px 1fr 1fr;
-  gap: 8px;
-  align-items: center;
-}
-
-.jog-axis {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.jog-row .button {
-  min-height: 40px;
-  font-size: 18px;
-}
-
-.gripper-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.manual-warning {
-  margin: 10px 2px 0;
-  color: var(--amber);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.cube-control {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+.cube-panel .control-hint {
   margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line-soft);
-}
-
-.cube-control > div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.cube-control span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.cube-control strong {
-  font-size: 13px;
 }

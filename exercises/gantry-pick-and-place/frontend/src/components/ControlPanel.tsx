@@ -42,12 +42,7 @@ export function ControlPanel({
   const primaryLabel = resumable ? "Resume sequence" : "Start sequence";
   const primaryDisabled = resumable
     ? !connected || busy || faulted || commandsBlocked
-    : !connected ||
-      busy ||
-      faulted ||
-      gripperClosed ||
-      !cubeAtStart ||
-      commandsBlocked;
+    : !connected || busy || faulted || !cubeAtStart || commandsBlocked;
   const homeDisabled = !connected || busy || faulted || commandsBlocked;
   const stopDisabled = !busy || commandsBlocked;
   const resetDisabled = !connected || !faulted || commandsBlocked;
@@ -64,12 +59,12 @@ export function ControlPanel({
     if (cubeLocation === "table_b") {
       hint = "The cube is on Table B. Return it to Table A first.";
     } else if (cubeHeld) {
-      hint = "The cube is in the gripper. Resume the sequence or return it to Table A.";
+      hint = "The cube is in the gripper but the gripper is open. Return it to Table A first.";
     } else {
       hint = "Cube location unknown. Return it to Table A first.";
     }
   } else if (gripperClosed) {
-    hint = "Open the gripper before starting the sequence.";
+    hint = "The gripper is closed. It will open when the sequence starts.";
   }
 
   return (

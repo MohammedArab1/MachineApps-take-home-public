@@ -156,20 +156,6 @@ class MoveRobotRequest(BaseModel):
     position: Position = Field(default_factory=Position)
 
 
-class JogRobotRequest(BaseModel):
-    """One relative manual move along a single axis."""
-
-    model_config = ConfigDict(
-        extra="ignore",
-        allow_inf_nan=False,
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-    axis: str = "x"
-    delta: float = 0.0
-
-
 class RunState(BaseModel):
     """Small persisted record of the last operation and robot state."""
 

@@ -1,4 +1,4 @@
-"""Run-state persistence, safe restart, and manual control tests."""
+"""Run-state persistence and safe restart tests."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import asyncio
 from app.machine import PickAndPlaceMachine
 from app.models import (
     DEFAULT_CONFIG,
-    JogRobotRequest,
+    MoveRobotRequest,
     Position,
     RunState,
 )
@@ -184,94 +184,14 @@ async def test_restart_from_interrupted_requires_reset(fast_settings) -> None:
     assert "Homing" in service.machine.fault_message
 
 
-async def test_jog_robot_moves_relative(service: GantryService, fake_robot: FakeRobot) -> None:
-    result = await service.jog_robot(JogRobotRequest(axis="x", delta=50))
-    assert result.ok
-    assert result.status.state == "Manual_move"
-    await wait_done(service.machine)
-    assert fake_robot.current_position == [50.0, 0.0, 0.0]
-
-    result = await service.jog_robot(JogRobotRequest(axis="z", delta=-10))
-    assert result.ok
-    await wait_done(service.machine)
-    assert fake_robot.current_position == [50.0, 0.0, -10.0]
-
-
-async def test_jog_robot_rejects_invalid_requests(
-    service: GantryService, fake_robot: FakeRobot
-) -> None:
-    original = fake_robot.current_position
-
-    assert not (await service.jog_robot(JogRobotRequest(axis="q", delta=10))).ok
-    assert not (await service.jog_robot(JogRobotRequest(axis="x", delta=0))).ok
-    assert not (
-        await service.jog_robot(JogRobotRequest.model_construct(axis="x", delta=float("nan")))
-    ).ok
-    assert not (await service.jog_robot(JogRobotRequest(axis="x", delta=2000))).ok
-    assert fake_robot.current_position == original
-    assert service.machine.state == "ready"
-
-
-async def test_jog_rejected_while_busy_and_in_fault(
-    service: GantryService, fake_robot: FakeRobot
-) -> None:
-    fake_robot.complete_after = 100
-    assert (await service.start_sequence()).ok
-    await wait_for_state(service.machine, "Cycle_moveToPick")
-
-    result = await service.jog_robot(JogRobotRequest(axis="x", delta=10))
-    assert not result.ok
-    assert "already running" in result.message
-    await service.stop_sequence()
-
-    assert (await service.simulate_fault()).ok
-    result = await service.jog_robot(JogRobotRequest(axis="x", delta=10))
-    assert not result.ok
-    assert "Reset" in result.message
-    assert (await service.reset()).ok
-
-
-async def test_manual_gripper(service: GantryService, fake_robot: FakeRobot) -> None:
-    result = await service.close_gripper()
-    assert result.ok
-    assert fake_robot.gripper == "closed"
-    assert service.status().gripper == "closed"
-
-    result = await service.close_gripper()
-    assert result.ok
-    assert "already closed" in result.message
-
-    result = await service.open_gripper()
-    assert result.ok
-    assert fake_robot.gripper == "open"
-
-
-async def test_manual_gripper_rejected_while_busy_and_in_fault(
-    service: GantryService, fake_robot: FakeRobot
-) -> None:
-    fake_robot.complete_after = 100
-    assert (await service.start_sequence()).ok
-    await wait_for_state(service.machine, "Cycle_moveToPick")
-
-    result = await service.close_gripper()
-    assert not result.ok
-    assert "Stop the robot" in result.message
-    await service.stop_sequence()
-
-    assert (await service.simulate_fault()).ok
-    result = await service.close_gripper()
-    assert not result.ok
-    assert "Reset" in result.message
-    assert (await service.reset()).ok
-
-
 async def test_gripper_state_survives_restart(fast_settings) -> None:
     run_state_repository = InMemoryRunStateRepository()
     robot = FakeRobot()
     machine = build_machine(robot, fast_settings)
     service = build_service(robot, machine, fast_settings, run_state_repository)
 
-    assert (await service.close_gripper()).ok
+    robot.close_gripper()
+    service._save_run_state_safely("idle")  # noqa: SLF001 - persist the stopped gripper
     persisted = run_state_repository.load()
     assert persisted is not None
     assert persisted.gripper == "closed"
@@ -334,27 +254,27 @@ async def test_run_state_storage_failure_does_not_break_the_app(
     assert service.machine.state == "ready"
 
 
-async def test_manual_commands_require_a_stopped_robot(
+async def test_motion_commands_require_a_stopped_robot(
     service: GantryService, fake_robot: FakeRobot
 ) -> None:
     fake_robot.axis_speed = [1.0, 0.0, 0.0]
-    assert not (await service.close_gripper()).ok
-    assert not (await service.jog_robot(JogRobotRequest(axis="x", delta=10))).ok
+    result = await service.move_robot(
+        MoveRobotRequest(position=Position(x=10, y=0, z=0))
+    )
+    assert not result.ok
     assert not (await service.start_sequence()).ok
     assert not (await service.home_robot()).ok
 
 
-async def test_start_sequence_requires_an_open_gripper(
+async def test_start_sequence_opens_a_closed_gripper_at_table_a(
     service: GantryService, fake_robot: FakeRobot
 ) -> None:
     fake_robot.gripper = "closed"
 
     result = await service.start_sequence()
-    assert not result.ok
-    assert "Open the gripper" in result.message
-    assert service.machine.state == "ready"
 
-    assert (await service.open_gripper()).ok
-    assert (await service.start_sequence()).ok
+    assert result.ok
+    assert fake_robot.calls[0] == ("open",)
     await wait_done(service.machine)
     assert service.machine.state == "ready"
+    assert service.status().cube_location == "table_b"

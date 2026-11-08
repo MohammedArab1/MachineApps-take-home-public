@@ -380,7 +380,7 @@ def test_progress_and_step_tables() -> None:
     assert STEP_LABELS["Cycle_lowerToPlace"] == "Lowering to destination"
     assert STEP_LABELS["Recovery_moveToPlace"] == "Resuming to destination"
     assert STEP_LABELS["Homing_moveHome"] == "Homing"
-    assert STEP_LABELS["Manual_move"] == "Manual move"
+    assert STEP_LABELS["Manual_move"] == "Moving to position"
     assert STEP_LABELS["ready"] == "Ready"
     assert STEP_LABELS["fault"] == "Fault"
 

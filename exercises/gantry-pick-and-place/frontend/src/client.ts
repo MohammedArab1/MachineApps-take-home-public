@@ -4,7 +4,6 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 
 import {
   GantryPickAndPlaceService,
-  JogRobotRequestSchema,
   SetConfigRequestSchema,
 } from "./gen/app_pb";
 import type { ConfigPayload } from "./types";
@@ -38,17 +37,6 @@ export const setConfig = (config: ConfigPayload) =>
   client.setConfig(create(SetConfigRequestSchema, config), {
     timeoutMs: COMMAND_TIMEOUT_MS,
   });
-
-export const jogRobot = (axis: string, delta: number) =>
-  client.jogRobot(create(JogRobotRequestSchema, { axis, delta }), {
-    timeoutMs: COMMAND_TIMEOUT_MS,
-  });
-
-export const openGripper = () =>
-  client.openGripper({}, { timeoutMs: COMMAND_TIMEOUT_MS });
-
-export const closeGripper = () =>
-  client.closeGripper({}, { timeoutMs: COMMAND_TIMEOUT_MS });
 
 export const resetCube = () =>
   client.resetCube({}, { timeoutMs: COMMAND_TIMEOUT_MS });

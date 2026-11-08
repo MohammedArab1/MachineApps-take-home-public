@@ -87,18 +87,14 @@ describe("ControlPanel", () => {
     );
   });
 
-  it("disables Start until the gripper is open", () => {
-    const closed = renderPanel(statusFixture({ gripper: "closed" }));
+  it("enables Start with a closed gripper at Table A", () => {
+    renderPanel(statusFixture({ gripper: "closed" }));
 
-    expect(screen.getByRole("button", { name: "Start sequence" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Start sequence" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Home robot" })).toBeEnabled();
     expect(screen.getByTestId("control-hint")).toHaveTextContent(
-      "Open the gripper before starting the sequence.",
+      "It will open when the sequence starts.",
     );
-    closed.unmount();
-
-    renderPanel(statusFixture({ gripper: "open" }));
-    expect(screen.getByRole("button", { name: "Start sequence" })).toBeEnabled();
   });
 
   it("disables Start when the cube is not at Table A", () => {
@@ -165,7 +161,7 @@ describe("ControlPanel", () => {
       screen.queryByRole("button", { name: "Resume sequence" }),
     ).not.toBeInTheDocument();
     expect(screen.getByTestId("control-hint")).toHaveTextContent(
-      "Resume the sequence or return it to Table A.",
+      "The cube is in the gripper but the gripper is open. Return it to Table A first.",
     );
   });
 

@@ -18,9 +18,6 @@ vi.mock("./client", () => ({
   openEvents: vi.fn(),
   recentEvents: vi.fn(),
   setConfig: vi.fn(),
-  jogRobot: vi.fn(),
-  openGripper: vi.fn(),
-  closeGripper: vi.fn(),
   resetCube: vi.fn(),
   homeRobot: vi.fn(),
   startSequence: vi.fn(),
@@ -69,15 +66,6 @@ beforeEach(() => {
   vi.mocked(client.recentEvents).mockResolvedValue(eventList([]));
   vi.mocked(client.setConfig).mockResolvedValue(
     actionResult(true, "Configuration saved"),
-  );
-  vi.mocked(client.jogRobot).mockResolvedValue(
-    actionResult(true, "Manual jog started"),
-  );
-  vi.mocked(client.openGripper).mockResolvedValue(
-    actionResult(true, "Gripper open"),
-  );
-  vi.mocked(client.closeGripper).mockResolvedValue(
-    actionResult(true, "Gripper closed"),
   );
   vi.mocked(client.resetCube).mockResolvedValue(
     actionResult(true, "Cube returned to Table A"),
@@ -300,17 +288,21 @@ describe("App", () => {
     );
   });
 
-  it("jogs and controls the gripper from the manual panel", async () => {
+  it("resets the cube from the cube panel", async () => {
     const user = userEvent.setup();
-    mockStreams(statusFixture());
+    mockStreams(
+      statusFixture({
+        cubeLocation: "table_b",
+        cubePosition: position(630, -550, 0),
+      }),
+    );
 
     render(<App />);
     await screen.findByText("Telemetry");
 
-    await user.click(screen.getByRole("button", { name: "Jog X positive" }));
-    expect(client.jogRobot).toHaveBeenCalledWith("x", 50);
-
-    await user.click(screen.getByRole("button", { name: "Close gripper" }));
-    expect(client.closeGripper).toHaveBeenCalledOnce();
+    await user.click(
+      screen.getByRole("button", { name: "Return cube to Table A" }),
+    );
+    expect(client.resetCube).toHaveBeenCalledOnce();
   });
 });

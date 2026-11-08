@@ -2,7 +2,6 @@ export type {
   ActionResult,
   Event,
   EventList,
-  JogRobotRequest,
   MachineConfig,
   MoveRobotRequest,
   Position,
