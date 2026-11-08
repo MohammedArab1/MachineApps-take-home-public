@@ -21,10 +21,11 @@ The frontend uses the TypeScript client generated from the proto emitted by
 
 ## Demo
 
-A silent, captioned 140-second walkthrough is available as
+A silent, captioned 107-second walkthrough is available as
 [MP4](docs/demo.mp4), [WebM](docs/demo.webm), or [GIF](docs/demo.gif). It shows
-the modeled cube following the gripper from Table A to Table B, the longer step
-pauses, and fault recovery.
+the modeled cube following the gripper from Table A to Table B, stopping safely
+with the cube held and resuming the placement, resetting the cube to Table A,
+and fault recovery.
 
 ---
 
