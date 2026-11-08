@@ -26,14 +26,14 @@ describe("CubePanel", () => {
 
     expect(screen.getByTestId("cube-location")).toHaveTextContent("On Table A");
     expect(
-      screen.getByRole("button", { name: "Return cube to Table A" }),
+      screen.getByRole("button", { name: "Reset cube to Table A" }),
     ).toBeDisabled();
     expect(screen.getByTestId("cube-hint")).toHaveTextContent(
       "starting position on Table A",
     );
   });
 
-  it("returns the cube to Table A from Table B", async () => {
+  it("resets the cube to Table A from Table B", async () => {
     const user = userEvent.setup();
     const panel = renderPanel(
       statusFixture({
@@ -44,7 +44,7 @@ describe("CubePanel", () => {
 
     expect(screen.getByTestId("cube-location")).toHaveTextContent("On Table B");
     const reset = screen.getByRole("button", {
-      name: "Return cube to Table A",
+      name: "Reset cube to Table A",
     });
     expect(reset).toBeEnabled();
     await user.click(reset);
@@ -64,7 +64,7 @@ describe("CubePanel", () => {
       "In gripper",
     );
     expect(
-      screen.getByRole("button", { name: "Return cube to Table A" }),
+      screen.getByRole("button", { name: "Reset cube to Table A" }),
     ).toBeDisabled();
     expect(screen.getByTestId("cube-hint")).toHaveTextContent(
       "Resume the sequence to place it",
@@ -81,7 +81,7 @@ describe("CubePanel", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: "Return cube to Table A" }),
+      screen.getByRole("button", { name: "Reset cube to Table A" }),
     ).toBeDisabled();
     expect(screen.getByTestId("cube-hint")).toHaveTextContent(
       "Stop the sequence",
@@ -93,7 +93,7 @@ describe("CubePanel", () => {
       statusFixture({ state: "fault", step: "Fault", fault: "boom" }),
     );
     expect(
-      screen.getByRole("button", { name: "Return cube to Table A" }),
+      screen.getByRole("button", { name: "Reset cube to Table A" }),
     ).toBeDisabled();
     expect(screen.getByTestId("cube-hint")).toHaveTextContent(
       "Reset the fault",
@@ -102,7 +102,7 @@ describe("CubePanel", () => {
 
     const offline = renderPanel(statusFixture(), { connected: false });
     expect(
-      screen.getByRole("button", { name: "Return cube to Table A" }),
+      screen.getByRole("button", { name: "Reset cube to Table A" }),
     ).toBeDisabled();
     expect(screen.getByTestId("cube-hint")).toHaveTextContent(
       "Live connection lost",
@@ -117,7 +117,7 @@ describe("CubePanel", () => {
       { pending: "reset-cube" },
     );
     expect(
-      screen.getByRole("button", { name: "Returning cube…" }),
+      screen.getByRole("button", { name: "Resetting cube…" }),
     ).toBeDisabled();
   });
 });

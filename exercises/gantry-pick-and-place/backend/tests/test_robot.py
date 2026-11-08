@@ -56,6 +56,17 @@ def test_move_home_uses_the_configured_home(monkeypatch: pytest.MonkeyPatch) -> 
     assert driver.at(home)
 
 
+def test_restore_position_is_stationary_and_validated() -> None:
+    driver = SimRobotDriver(Robot(initial_position=[0, 0, 0]))
+
+    driver.restore_position([10.0, 20.0, 30.0])
+
+    assert driver.current_position == [10.0, 20.0, 30.0]
+    assert not driver.moving
+    with pytest.raises(RobotError, match="outside the limits"):
+        driver.restore_position([1001.0, 0.0, 0.0])
+
+
 @pytest.mark.parametrize("speed", [0, -1, 101])
 def test_invalid_speed_is_rejected_before_the_simulator(speed: int) -> None:
     robot = Robot()

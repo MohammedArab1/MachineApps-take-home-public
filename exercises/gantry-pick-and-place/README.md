@@ -72,7 +72,7 @@ development flow.
 ### Tests and checks
 
 ```bash
-# backend: 176 tests, ~96.2% coverage, ruff
+# backend: 179 tests, ~95.9% coverage, ruff
 cd backend
 .venv/bin/ruff check app tests
 .venv/bin/pytest --cov=app --cov-report=term-missing
@@ -106,7 +106,7 @@ make build
   destination, and a vertical Z gauge. The cube follows the gripper while it is
   held.
 - **Controls**: Home, Start/Resume, Stop, and Reset, plus a **Cube** panel with
-  **Return cube to Table A**. There are no manual jog or gripper controls in the
+  **Reset cube to Table A**. There are no manual jog or gripper controls in the
   dashboard. Motion commands are enabled only when the robot is idle and not
   faulted; Stop remains available while an operation is running, even if the
   telemetry stream drops. Start is disabled unless the cube is on Table A; if
@@ -223,7 +223,7 @@ is a separate command.
 Cube state is tracked independently: it moves from `table_a` to `held` when the
 gripper closes at the pick, and from `held` to `table_b` when the gripper opens
 at the destination. Start is rejected unless the cube is back on Table A;
-`ResetCube` returns it there for another run.
+`ResetCube` resets it there for another run.
 
 If **Stop** interrupts the cycle after the pick, the cube remains held and the
 gripper remains closed. **Resume sequence** lifts straight up at the current
@@ -269,7 +269,7 @@ All application traffic uses Connect RPC under `/rpc`:
 `SetRobotPosition` is an absolute position move through the same state machine,
 not a teleport. It remains API-only to satisfy the required Get/Set robot
 position surface; the dashboard does not expose manual motion or gripper
-controls. `ResetCube` returns the simulated cube to Table A and requires an open
+controls. `ResetCube` resets the simulated cube to Table A and requires an open
 gripper. `StartSequence` is rejected unless the cube is on Table A; it opens a
 closed gripper automatically before moving, because no cube is held in that
 state. `ResumeSequence` is accepted only when the machine is ready and a stopped
@@ -345,7 +345,7 @@ backend/
 │   ├── service.py                # orchestration and command rules
 │   ├── api.py                    # Connect actions
 │   └── main.py                   # wiring, lifespan, proto emission
-└── tests/                        # 176 tests
+└── tests/                        # 179 tests
 ```
 
 ### Frontend layout
@@ -428,9 +428,11 @@ audit logging. The repository protocols have in-memory implementations so
 unit/API tests do not depend on SQLite. If a config row is invalid, the app logs
 a warning, falls back to defaults, and rewrites it.
 
-The run state is updated on every state transition and on safe shutdown. On
-startup:
+The run state is updated on every state transition, at most once per second
+while the robot is moving, and on safe shutdown. On startup:
 
+- The last known robot position, gripper state, and cube state are restored
+  before the run status is evaluated, so the robot reappears where it stopped.
 - `running` or `interrupted` → the machine enters `fault` with a message naming
   the interrupted step and last known position; the operator must inspect the
   cell and press Reset.
@@ -440,12 +442,13 @@ startup:
 
 The app never auto-resumes motion. The run state is a safety record, not a
 durable execution engine. A hard kill (SIGKILL) cannot run cleanup, but the last
-persisted `running` record still forces a fault on the next start.
+periodic position save and `running` record still restore the robot position and
+force a fault on the next start.
 
 The FastAPI lifespan cancels the telemetry and step tasks, halts the simulator,
-and records `interrupted` if an operation was active. The robot is left stopped
-where it was; the simulator starts at the configured home on the next process
-start. A real machine would need an explicit re-home and hardware safety
+and records `interrupted` if an operation was active. The last known robot
+position is restored on the next process start; motion is never auto-resumed. A
+real machine would need an explicit re-home and hardware safety
 checks.
 
 ### One uvicorn worker
@@ -464,12 +467,12 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
 
 ### Testing strategy
 
-- **Backend:** 176 tests. A deterministic `FakeRobot` exercises the state
+- **Backend:** 179 tests. A deterministic `FakeRobot` exercises the state
   machine without sleeping; the real simulator adapter is tested with a patched
   clock; the SQLite repositories are tested with a temporary database and a
   simulated restart; the Connect actions are exercised through the real ASGI
   app; a real uvicorn subprocess verifies the stream framing; the proto is
-  checked against the Python surface. Coverage is ~96.2% of `app/`.
+  checked against the Python surface. Coverage is ~95.9% of `app/`.
 - **Frontend:** 94 tests with Vitest + React Testing Library. Scene math,
   validation, event merging, every component state, the cube panel, the
   stream hook's reconnect/stall/unmount behavior, and the app's loading/
@@ -521,7 +524,7 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
    steps. The cube follows the gripper ring while it is held.
 4. The sequence ends with the cube on Table B and the robot lifted above it.
    Click **Home robot** to return.
-5. To run again, click **Return cube to Table A**, then **Start sequence**.
+5. To run again, click **Reset cube to Table A**, then **Start sequence**.
    Edit the cube or destination coordinates and click **Save configuration**.
    Reload the page; the values are restored from SQLite.
 6. Start a sequence, stop the server mid-operation, and start it again. The

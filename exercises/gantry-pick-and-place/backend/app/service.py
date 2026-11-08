@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections import deque
 
 from pydantic import ValidationError
@@ -68,6 +69,7 @@ class GantryService:
         self._lock = asyncio.Lock()
         self._active_operation = ""
         self._cube_location = CUBE_AT_TABLE_A
+        self._last_position_save_at = 0.0
 
         self.machine.state_listener = self._on_state_change
         self.machine.gripper_listener = self._on_gripper_change
@@ -130,6 +132,16 @@ class GantryService:
         if persisted is None:
             self._save_run_state_safely("idle")
             return
+
+        if persisted.robot_position.is_within_limits():
+            try:
+                self.robot.restore_position(persisted.robot_position.to_list())
+            except Exception:
+                logger.exception("Could not restore the persisted robot position")
+        else:
+            logger.warning(
+                "Persisted robot position is outside the workspace; keeping home"
+            )
 
         self._cube_location = persisted.cube_location or CUBE_AT_TABLE_A
         if persisted.gripper == "closed":
@@ -205,6 +217,18 @@ class GantryService:
             updated_at=utc_now_iso(),
         )
         self.run_state_repository.save(run_state)
+        self._last_position_save_at = time.monotonic()
+
+    def persist_active_position(self) -> None:
+        """Persist the moving robot position at most once per second."""
+
+        if not self.machine.busy:
+            return
+        now = time.monotonic()
+        if now - self._last_position_save_at < 1.0:
+            return
+        self._last_position_save_at = now
+        self._save_run_state_safely("running")
 
     def _save_run_state_safely(self, status: str) -> None:
         try:
@@ -392,13 +416,13 @@ class GantryService:
 
     def _cube_start_message(self) -> str:
         if self._cube_location == CUBE_AT_TABLE_B:
-            return "The cube is on Table B. Return it to Table A before starting"
+            return "The cube is on Table B. Reset it to Table A before starting"
         if self._cube_location == CUBE_HELD:
             return (
                 "The sequence was stopped with the cube in the gripper. "
-                "Resume it or return the cube to Table A"
+                "Resume it or reset the cube to Table A"
             )
-        return "The cube location is unknown. Return it to Table A before starting"
+        return "The cube location is unknown. Reset it to Table A before starting"
 
     async def reset_cube(self) -> ActionResult:
         async with self._lock:
@@ -412,10 +436,10 @@ class GantryService:
             self._save_run_state_safely("idle")
             await self.emit_event(
                 "info",
-                "Cube returned to Table A",
+                "Cube reset to Table A",
                 "Simulation reset of the cube position.",
             )
-            return await self._result(True, "Cube returned to Table A")
+            return await self._result(True, "Cube reset to Table A")
 
     async def stop_sequence(self) -> ActionResult:
         async with self._lock:

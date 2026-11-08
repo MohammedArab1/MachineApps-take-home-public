@@ -29,12 +29,16 @@ class FakeService:
         )
         self.events: list[tuple[str, str, str]] = []
         self.status_count = 0
+        self.position_saves = 0
 
     async def emit_event(self, level: str, message: str, detail: str = "") -> None:
         self.events.append((level, message, detail))
 
     async def publish_status(self) -> None:
         self.status_count += 1
+
+    def persist_active_position(self) -> None:
+        self.position_saves += 1
 
 
 async def test_run_publishes_status_and_emits_state_events() -> None:
@@ -44,6 +48,7 @@ async def test_run_publishes_status_and_emits_state_events() -> None:
     try:
         await asyncio.sleep(0.03)
         assert service.status_count >= 1
+        assert service.position_saves >= 1
 
         service.machine.state = "fault"
         service.machine.fault_message = "boom"

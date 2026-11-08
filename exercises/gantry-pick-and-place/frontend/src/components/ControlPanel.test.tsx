@@ -104,7 +104,7 @@ describe("ControlPanel", () => {
 
     expect(screen.getByRole("button", { name: "Start sequence" })).toBeDisabled();
     expect(screen.getByTestId("control-hint")).toHaveTextContent(
-      "The cube is on Table B. Return it to Table A first.",
+      "The cube is on Table B. Reset it to Table A first.",
     );
   });
 
@@ -161,7 +161,7 @@ describe("ControlPanel", () => {
       screen.queryByRole("button", { name: "Resume sequence" }),
     ).not.toBeInTheDocument();
     expect(screen.getByTestId("control-hint")).toHaveTextContent(
-      "The cube is in the gripper but the gripper is open. Return it to Table A first.",
+      "The cube is in the gripper but the gripper is open. Reset it to Table A first.",
     );
   });
 

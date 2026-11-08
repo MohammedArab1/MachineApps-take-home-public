@@ -57,11 +57,11 @@ export function ControlPanel({
       "The sequence was stopped with the cube in the gripper. Resume to finish placing it.";
   } else if (!cubeAtStart) {
     if (cubeLocation === "table_b") {
-      hint = "The cube is on Table B. Return it to Table A first.";
+      hint = "The cube is on Table B. Reset it to Table A first.";
     } else if (cubeHeld) {
-      hint = "The cube is in the gripper but the gripper is open. Return it to Table A first.";
+      hint = "The cube is in the gripper but the gripper is open. Reset it to Table A first.";
     } else {
-      hint = "Cube location unknown. Return it to Table A first.";
+      hint = "Cube location unknown. Reset it to Table A first.";
     }
   } else if (gripperClosed) {
     hint = "The gripper is closed. It will open when the sequence starts.";

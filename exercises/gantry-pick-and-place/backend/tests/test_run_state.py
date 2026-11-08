@@ -83,6 +83,31 @@ async def test_start_sequence_persists_running_then_idle(
     assert persisted.operation == ""
 
 
+async def test_active_position_is_persisted_periodically(
+    service: GantryService,
+    run_state_repository: InMemoryRunStateRepository,
+    fake_robot: FakeRobot,
+) -> None:
+    fake_robot.complete_after = 100
+    assert (await service.start_sequence()).ok
+    await wait_for_state(service.machine, "Cycle_moveToPick")
+
+    fake_robot.position = [12.0, 34.0, 56.0]
+    saves_before = len(run_state_repository.saved)
+    service._last_position_save_at = 0.0  # noqa: SLF001 - force the periodic save
+    service.persist_active_position()
+
+    assert len(run_state_repository.saved) == saves_before + 1
+    persisted = run_state_repository.load()
+    assert persisted is not None
+    assert persisted.status == "running"
+    assert persisted.robot_position == Position(x=12, y=34, z=56)
+
+    service.persist_active_position()
+    assert len(run_state_repository.saved) == saves_before + 1
+    await service.stop_sequence()
+
+
 async def test_shutdown_marks_interrupted_and_restart_faults(fast_settings) -> None:
     robot = FakeRobot(complete_after=100)
     machine = build_machine(robot, fast_settings)
@@ -127,12 +152,13 @@ async def test_shutdown_marks_interrupted_and_restart_faults(fast_settings) -> N
     assert persisted.status == "idle"
 
 
-async def test_restart_from_idle_restores_gripper(fast_settings) -> None:
+async def test_restart_from_idle_restores_position_and_gripper(fast_settings) -> None:
     run_state_repository = InMemoryRunStateRepository(
         RunState(
             status="idle",
             state="ready",
             step="Ready",
+            robot_position=Position(x=123, y=-45, z=67),
             gripper="closed",
         )
     )
@@ -141,7 +167,44 @@ async def test_restart_from_idle_restores_gripper(fast_settings) -> None:
     service = build_service(robot, machine, fast_settings, run_state_repository)
 
     assert service.machine.state == "ready"
+    assert robot.current_position == [123.0, -45.0, 67.0]
     assert robot.gripper == "closed"
+
+
+async def test_stop_then_restart_restores_position_and_can_resume(fast_settings) -> None:
+    run_state_repository = InMemoryRunStateRepository()
+    robot = FakeRobot(complete_after=100)
+    machine = build_machine(robot, fast_settings)
+    service = build_service(robot, machine, fast_settings, run_state_repository)
+
+    assert (await service.start_sequence()).ok
+    await wait_for_state(machine, "Cycle_liftFromPick")
+    robot.position = [-500.0, 500.0, 60.0]
+    assert (await service.stop_sequence()).ok
+
+    persisted = run_state_repository.load()
+    assert persisted is not None
+    assert persisted.robot_position == Position(x=-500, y=500, z=60)
+    assert persisted.cube_location == "held"
+    assert persisted.gripper == "closed"
+
+    restarted_robot = FakeRobot(complete_after=1)
+    restarted_machine = build_machine(restarted_robot, fast_settings)
+    restarted = build_service(
+        restarted_robot,
+        restarted_machine,
+        fast_settings,
+        run_state_repository,
+    )
+
+    assert restarted.machine.state == "ready"
+    assert restarted_robot.current_position == [-500.0, 500.0, 60.0]
+    assert restarted_robot.gripper == "closed"
+    assert restarted.status().cube_location == "held"
+
+    assert (await restarted.resume_sequence()).ok
+    await wait_done(restarted.machine)
+    assert restarted.status().cube_location == "table_b"
 
 
 async def test_restart_from_fault_restores_fault(fast_settings) -> None:
@@ -182,6 +245,7 @@ async def test_restart_from_interrupted_requires_reset(fast_settings) -> None:
     assert service.machine.state == "fault"
     assert "shut down during home" in service.machine.fault_message
     assert "Homing" in service.machine.fault_message
+    assert robot.current_position == [10.0, 20.0, 30.0]
 
 
 async def test_gripper_state_survives_restart(fast_settings) -> None:

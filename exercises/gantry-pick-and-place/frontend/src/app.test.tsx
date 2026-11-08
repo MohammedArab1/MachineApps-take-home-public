@@ -68,7 +68,7 @@ beforeEach(() => {
     actionResult(true, "Configuration saved"),
   );
   vi.mocked(client.resetCube).mockResolvedValue(
-    actionResult(true, "Cube returned to Table A"),
+    actionResult(true, "Cube reset to Table A"),
   );
   vi.mocked(client.homeRobot).mockResolvedValue(
     actionResult(true, "Homing started"),
@@ -301,7 +301,7 @@ describe("App", () => {
     await screen.findByText("Telemetry");
 
     await user.click(
-      screen.getByRole("button", { name: "Return cube to Table A" }),
+      screen.getByRole("button", { name: "Reset cube to Table A" }),
     );
     expect(client.resetCube).toHaveBeenCalledOnce();
   });

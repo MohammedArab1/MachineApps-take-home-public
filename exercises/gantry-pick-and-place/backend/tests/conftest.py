@@ -128,6 +128,12 @@ class FakeRobot:
         self.position = list(home)
         self.axis_speed = [0.0, 0.0, 0.0]
 
+    def restore_position(self, position: list[float]) -> None:
+        self.position = list(position)
+        self.axis_speed = [0.0, 0.0, 0.0]
+        self._target = None
+        self._remaining = self.complete_after
+
     def close_gripper(self) -> None:
         self._record("close")
         if self.fail_on_close:

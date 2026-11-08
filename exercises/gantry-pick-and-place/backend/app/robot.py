@@ -43,6 +43,8 @@ class RobotDriver(Protocol):
 
     def move_home(self, home: list[float], speed: int) -> None: ...
 
+    def restore_position(self, position: list[float]) -> None: ...
+
     def close_gripper(self) -> None: ...
 
     def open_gripper(self) -> None: ...
@@ -100,6 +102,14 @@ class SimRobotDriver:
         _, _, error = self._robot.move_home(speed)
         if error:
             raise RobotError(error)
+
+    def restore_position(self, position: list[float]) -> None:
+        """Restore a persisted, stationary position without planning motion."""
+
+        self._validate(position, 1)
+        self._robot.current_position = list(position)
+        self._robot.axis_speed = [0.0, 0.0, 0.0]
+        self._robot.last_motion_time = time.perf_counter()
 
     def close_gripper(self) -> None:
         self._robot.closed_gripper()

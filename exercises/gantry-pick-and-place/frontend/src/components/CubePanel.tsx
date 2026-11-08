@@ -33,9 +33,9 @@ export function CubePanel({
   else if (cubeLocation === "held") {
     hint = "The cube is held. Resume the sequence to place it on Table B.";
   } else if (cubeLocation === "table_b") {
-    hint = "The cube is on Table B. Return it to Table A for another run.";
+    hint = "The cube is on Table B. Reset it to Table A for another run.";
   } else if (cubeLocation === "unknown") {
-    hint = "The cube location is unknown. Return it to Table A.";
+    hint = "The cube location is unknown. Reset it to Table A.";
   }
 
   return (
@@ -60,8 +60,8 @@ export function CubePanel({
         aria-busy={pending === "reset-cube"}
       >
         {pending === "reset-cube"
-          ? "Returning cube…"
-          : "Return cube to Table A"}
+          ? "Resetting cube…"
+          : "Reset cube to Table A"}
       </button>
 
       <p className="control-hint" data-testid="cube-hint">

@@ -91,6 +91,7 @@ class Telemetry:
                 self._last_state = state
 
             await self.service.publish_status()
+            self.service.persist_active_position()
 
             interval = (
                 self.service.settings.status_active_heartbeat_s
