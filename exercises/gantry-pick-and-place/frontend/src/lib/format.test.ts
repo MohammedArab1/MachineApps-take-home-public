@@ -22,8 +22,8 @@ describe("state labels and tones", () => {
     expect(stateTone("fault", true, "boom")).toBe("fault");
     expect(stateTone("ready", true, "")).toBe("active");
     expect(stateTone("ready", false, "")).toBe("ready");
-    expect(stateTone("Manual_move", true, "")).toBe("active");
-    expect(stateTone("Manual_move", false, "")).toBe("idle");
+    expect(stateTone("Positioning_move", true, "")).toBe("active");
+    expect(stateTone("Positioning_move", false, "")).toBe("idle");
   });
 });
 

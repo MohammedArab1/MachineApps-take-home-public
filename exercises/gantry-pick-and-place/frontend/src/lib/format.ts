@@ -4,7 +4,7 @@ export const STATE_LABELS: Record<string, string> = {
   ready: "Ready",
   fault: "Fault",
   Homing_moveHome: "Homing",
-  Manual_move: "Moving to position",
+  Positioning_move: "Moving to position",
   Recovery_moveToPlace: "Resuming to destination",
   Cycle_moveToPick: "Moving to cube",
   Cycle_lowerToPick: "Lowering to cube",

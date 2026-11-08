@@ -165,7 +165,7 @@ async def test_set_robot_position_moves(api_client) -> None:
 
     assert response.status_code == 200
     assert response.json()["ok"] is True
-    assert response.json()["status"]["state"] == "Manual_move"
+    assert response.json()["status"]["state"] == "Positioning_move"
     await wait_done(service.machine)
     assert robot.current_position == [10.0, 20.0, 30.0]
 

@@ -55,7 +55,7 @@ def test_state_names_are_hierarchical_and_parseable() -> None:
     assert str(States.cycle.liftFromPlace) == "Cycle_liftFromPlace"
     assert str(States.recovery.moveToPlace) == "Recovery_moveToPlace"
     assert str(States.homing.moveHome) == "Homing_moveHome"
-    assert str(States.manual.move) == "Manual_move"
+    assert str(States.positioning.move) == "Positioning_move"
     # The hierarchy separator is "_"; member names must not contain it.
     for state in CYCLE_STATES:
         member = str(state).split("_", 1)[1]
@@ -298,7 +298,7 @@ async def test_home_fault(fast_settings) -> None:
     assert "simulated home failure" in machine.fault_message
 
 
-async def test_manual_move(fast_settings) -> None:
+async def test_position_move(fast_settings) -> None:
     robot = FakeRobot()
     machine = PickAndPlaceMachine(
         robot,
@@ -306,7 +306,7 @@ async def test_manual_move(fast_settings) -> None:
         gripper_settle_s=0.0,
         min_motion_timeout_s=0.2,
     )
-    assert machine.manual_move([10.0, 20.0, 30.0], 50)
+    assert machine.position_move([10.0, 20.0, 30.0], 50)
     await wait_done(machine)
 
     assert machine.state == "ready"
@@ -328,7 +328,7 @@ async def test_busy_guards(fast_settings) -> None:
 
     assert not machine.start_sequence(DEFAULT_CONFIG)
     assert not machine.home_robot(DEFAULT_CONFIG)
-    assert not machine.manual_move([1.0, 2.0, 3.0], 50)
+    assert not machine.position_move([1.0, 2.0, 3.0], 50)
 
     await machine.cancel_tasks()
     robot.halt()
@@ -339,7 +339,7 @@ async def test_busy_guards(fast_settings) -> None:
 def test_guards_reject_missing_inputs(machine: PickAndPlaceMachine) -> None:
     assert not machine.trigger("start")
     assert not machine.trigger("home")
-    assert not machine.trigger("manual")
+    assert not machine.trigger("position")
 
 
 def test_stop_from_ready_returns_false(machine: PickAndPlaceMachine) -> None:
@@ -366,7 +366,7 @@ def test_stop_and_fail_transitions_exist_for_every_active_state(
         assert "fail" in triggers
     assert "stop" in machine.get_triggers("Recovery_moveToPlace")
     assert "stop" in machine.get_triggers("Homing_moveHome")
-    assert "stop" in machine.get_triggers("Manual_move")
+    assert "stop" in machine.get_triggers("Positioning_move")
     assert "fail" in machine.get_triggers("Recovery_moveToPlace")
     assert "fail" in machine.get_triggers("ready")
     assert "reset" in machine.get_triggers("fault")
@@ -380,7 +380,7 @@ def test_progress_and_step_tables() -> None:
     assert STEP_LABELS["Cycle_lowerToPlace"] == "Lowering to destination"
     assert STEP_LABELS["Recovery_moveToPlace"] == "Resuming to destination"
     assert STEP_LABELS["Homing_moveHome"] == "Homing"
-    assert STEP_LABELS["Manual_move"] == "Moving to position"
+    assert STEP_LABELS["Positioning_move"] == "Moving to position"
     assert STEP_LABELS["ready"] == "Ready"
     assert STEP_LABELS["fault"] == "Fault"
 
@@ -417,10 +417,10 @@ def test_require_config_raises(machine: PickAndPlaceMachine) -> None:
         machine._require_config()  # noqa: SLF001
 
 
-def test_manual_entry_without_target_faults(machine: PickAndPlaceMachine) -> None:
-    machine._enter_manual(None)  # noqa: SLF001
+def test_position_entry_without_target_faults(machine: PickAndPlaceMachine) -> None:
+    machine._enter_position(None)  # noqa: SLF001
     assert machine.state == "fault"
-    assert "no manual target" in machine.fault_message
+    assert "no position target" in machine.fault_message
 
 
 async def test_home_waits_for_motion_completion(

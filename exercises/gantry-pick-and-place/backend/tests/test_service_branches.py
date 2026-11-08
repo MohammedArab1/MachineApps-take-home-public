@@ -93,7 +93,7 @@ async def test_move_rejected_while_busy(service: GantryService, fake_robot: Fake
 async def test_move_rejected_by_machine(
     service: GantryService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(service.machine, "manual_move", lambda target, speed: False)
+    monkeypatch.setattr(service.machine, "position_move", lambda target, speed: False)
     result = await service.move_robot(MoveRobotRequest())
     assert not result.ok
     assert "Cannot move" in result.message

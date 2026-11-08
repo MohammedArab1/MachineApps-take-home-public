@@ -48,7 +48,7 @@ class Homing(StateGroup):
     moveHome: State = State()
 
 
-class Manual(StateGroup):
+class Positioning(StateGroup):
     move: State = State()
 
 
@@ -56,17 +56,17 @@ class States:
     cycle = Cycle()
     recovery = Recovery()
     homing = Homing()
-    manual = Manual()
+    positioning = Positioning()
 
 
 class Triggers:
     start = Trigger("start")
     resume = Trigger("resume")
     home = Trigger("home")
-    manual = Trigger("manual")
+    position = Trigger("position")
     next = Trigger("next")
     homed = Trigger("homed")
-    moved = Trigger("moved")
+    positioned = Trigger("positioned")
     stop = Trigger("stop")
     fail = Trigger("fail")
 
@@ -86,14 +86,14 @@ ACTIVE_STATES = [
     *CYCLE_STATES,
     States.recovery.moveToPlace,
     States.homing.moveHome,
-    States.manual.move,
+    States.positioning.move,
 ]
 
 TRANSITIONS: list[dict[str, str]] = [
     Triggers.start.transition(BaseStates.READY.value, States.cycle.moveToPick),
     Triggers.resume.transition(BaseStates.READY.value, States.recovery.moveToPlace),
     Triggers.home.transition(BaseStates.READY.value, States.homing.moveHome),
-    Triggers.manual.transition(BaseStates.READY.value, States.manual.move),
+    Triggers.position.transition(BaseStates.READY.value, States.positioning.move),
     Triggers.next.transition(States.recovery.moveToPlace, States.cycle.lowerToPlace),
     Triggers.next.transition(States.cycle.moveToPick, States.cycle.lowerToPick),
     Triggers.next.transition(States.cycle.lowerToPick, States.cycle.closeGripper),
@@ -104,7 +104,7 @@ TRANSITIONS: list[dict[str, str]] = [
     Triggers.next.transition(States.cycle.openGripper, States.cycle.liftFromPlace),
     Triggers.next.transition(States.cycle.liftFromPlace, BaseStates.READY.value),
     Triggers.homed.transition(States.homing.moveHome, BaseStates.READY.value),
-    Triggers.moved.transition(States.manual.move, BaseStates.READY.value),
+    Triggers.positioned.transition(States.positioning.move, BaseStates.READY.value),
     Triggers.fail.transition(BaseStates.READY.value, BaseStates.FAULT.value),
 ]
 
@@ -124,7 +124,7 @@ STEP_LABELS: dict[str, str] = {
     str(States.cycle.liftFromPlace): "Lifting from destination",
     str(States.recovery.moveToPlace): "Resuming to destination",
     str(States.homing.moveHome): "Homing",
-    str(States.manual.move): "Moving to position",
+    str(States.positioning.move): "Moving to position",
     BaseStates.READY.value: "Ready",
     BaseStates.FAULT.value: "Fault",
 }
@@ -166,8 +166,8 @@ class PickAndPlaceMachine(StateMachine):
         self.motion_timeout_margin_s = motion_timeout_margin_s
 
         self.operation_config: MachineConfig | None = None
-        self.manual_target: list[float] | None = None
-        self.manual_speed: int = 90
+        self.position_target: list[float] | None = None
+        self.position_speed: int = 90
         self.fault_message: str = ""
         self.step: str = "Ready"
         self.progress: float = 0.0
@@ -197,11 +197,11 @@ class PickAndPlaceMachine(StateMachine):
         self.operation_done.clear()
         return bool(self.trigger(Triggers.home.name))
 
-    def manual_move(self, target: list[float], speed: int) -> bool:
-        self.manual_target = list(target)
-        self.manual_speed = speed
+    def position_move(self, target: list[float], speed: int) -> bool:
+        self.position_target = list(target)
+        self.position_speed = speed
         self.operation_done.clear()
-        return bool(self.trigger(Triggers.manual.name))
+        return bool(self.trigger(Triggers.position.name))
 
     def stop_operation(self) -> bool:
         return bool(self.trigger(Triggers.stop.name))
@@ -238,9 +238,9 @@ class PickAndPlaceMachine(StateMachine):
     def _guard_home(self) -> bool:
         return self.state == BaseStates.READY.value and self.operation_config is not None
 
-    @guard(Triggers.manual)
-    def _guard_manual(self) -> bool:
-        return self.state == BaseStates.READY.value and self.manual_target is not None
+    @guard(Triggers.position)
+    def _guard_position(self) -> bool:
+        return self.state == BaseStates.READY.value and self.position_target is not None
 
     # ------------------------------------------------------------------
     # Global state bookkeeping
@@ -321,16 +321,16 @@ class PickAndPlaceMachine(StateMachine):
             )
         )
 
-    @on_enter_state(States.manual.move)
-    def _enter_manual(self, _: Any) -> None:
-        if self.manual_target is None:
-            self._fail(RuntimeError("no manual target was provided"))
+    @on_enter_state(States.positioning.move)
+    def _enter_position(self, _: Any) -> None:
+        if self.position_target is None:
+            self._fail(RuntimeError("no position target was provided"))
             return
         self.spawn(
             self._motion_step(
-                list(self.manual_target),
-                self.manual_speed,
-                Triggers.moved.name,
+                list(self.position_target),
+                self.position_speed,
+                Triggers.positioned.name,
             )
         )
 

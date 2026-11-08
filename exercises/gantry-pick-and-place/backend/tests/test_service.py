@@ -199,7 +199,7 @@ async def test_home_robot(
 async def test_move_robot(service: GantryService, fake_robot: FakeRobot) -> None:
     result = await service.move_robot(MoveRobotRequest(position=Position(x=10, y=20, z=30)))
     assert result.ok
-    assert result.status.state == "Manual_move"
+    assert result.status.state == "Positioning_move"
     await wait_done(service.machine)
     assert service.machine.state == "ready"
     assert fake_robot.current_position == [10.0, 20.0, 30.0]

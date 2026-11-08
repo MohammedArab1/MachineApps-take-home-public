@@ -189,8 +189,8 @@ stateDiagram-v2
 
     ready --> Homing_moveHome: home
     Homing_moveHome --> ready: homed
-    ready --> Manual_move: set position
-    Manual_move --> ready: moved
+    ready --> Positioning_move: set position
+    Positioning_move --> ready: positioned
 
     ready --> fault: fail
     Cycle_moveToPick --> fault: fail
@@ -203,7 +203,7 @@ stateDiagram-v2
     Cycle_liftFromPlace --> fault: fail
     Recovery_moveToPlace --> fault: fail
     Homing_moveHome --> fault: fail
-    Manual_move --> fault: fail
+    Positioning_move --> fault: fail
     fault --> ready: reset
 ```
 

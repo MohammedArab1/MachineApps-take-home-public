@@ -403,7 +403,7 @@ class GantryService:
                     False, "Target position must be within +/-1000 mm on every axis"
                 )
             self._active_operation = "position"
-            if not self.machine.manual_move(position.to_list(), self.config.speed):
+            if not self.machine.position_move(position.to_list(), self.config.speed):
                 self._active_operation = ""
                 self._save_run_state_safely("idle")
                 return await self._result(False, f"Cannot move from state '{self.machine.state}'")
