@@ -15,13 +15,13 @@ The backend uses:
   the machine configuration in SQLite.
 
 The frontend uses the TypeScript client generated from the proto emitted by
-`vention-communication`; it never polls for live state.
+`vention-communication`.
 
 ![Dashboard showing the cell view, telemetry, controls, configuration, and activity log](docs/dashboard.png)
 
 ## Demo
 
-A silent, captioned 107-second walkthrough is available as
+A video is available as
 [MP4](docs/demo.mp4), [WebM](docs/demo.webm), or [GIF](docs/demo.gif). It shows
 the modeled cube following the gripper from Table A to Table B, stopping safely
 with the cube held and resuming the placement, resetting the cube to Table A,
@@ -44,10 +44,6 @@ The frontend nginx container proxies `/rpc` to the backend with buffering
 disabled so the telemetry stream works through the proxy. The SQLite database
 lives in the `gantry-data` volume, so the configuration survives restarts.
 
-The production container has the developer fault simulator disabled. To use
-it, run locally (below) or set `GANTRY_ENABLE_DEV_TOOLS=true` on the backend and
-build the frontend in dev mode.
-
 ### Local development
 
 The Vention libraries require **Python 3.10** (`>=3.10,<3.11`).
@@ -66,9 +62,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5173>. Vite proxies `/rpc` to
-`http://localhost:8000`, so no CORS configuration is needed for the normal
-development flow.
+Open <http://localhost:5173>.
 
 ### Tests and checks
 
@@ -107,15 +101,14 @@ make build
   destination, and a vertical Z gauge. The cube follows the gripper while it is
   held.
 - **Controls**: Home, Start/Resume, Stop, and Reset, plus a **Cube** panel with
-  **Reset cube to Table A**. There are no manual jog or gripper controls in the
-  dashboard. Motion commands are enabled only when the robot is idle and not
+  **Reset cube to Table A**. Motion commands are enabled only when the robot is idle and not
   faulted; Stop remains available while an operation is running, even if the
   telemetry stream drops. Start is disabled unless the cube is on Table A; if
   the gripper is closed with no cube held, it opens automatically when the
   sequence starts. If Stop leaves the cube held, the primary button becomes
   **Resume sequence** to finish the placement.
 - **Configuration**: cube start, destination, home, speed, and approach height.
-  The form validates locally and the server validates again. Configuration is
+  Configuration is
   persisted through `vention-storage`.
 - **Error and connection states**: a red fault banner with Reset, a connection
   banner with automatic stream reconnect, and a dismissible command result
@@ -162,15 +155,11 @@ Validation rules:
   `robot_sim.move_to` divides by the planned motion time.
 - Approach height is 0 to 1000 mm.
 
-The dashboard draws Table B as a 500 mm square rotated 45°, matching the
-figure: its right corner sits close to the right cell edge and its bottom
-corner is inset ~100 mm. The configured coordinates are authoritative.
-
 ---
 
 ## Sequence
 
-The required sequence is modelled as eight explicit leaf states:
+The required sequence is modelled as eight states:
 
 ```mermaid
 stateDiagram-v2
@@ -229,19 +218,12 @@ at the destination. Start is rejected unless the cube is back on Table A;
 If **Stop** interrupts the cycle after the pick, the cube remains held and the
 gripper remains closed. **Resume sequence** lifts straight up at the current
 X/Y to a safe travel height, moves to the Table B approach point, then joins the
-normal lower, open, and lift steps. It never re-picks from Table A and never
-drags the cube sideways along a table. If Stop happened before the pick, the
+normal lower, open, and lift steps. If Stop happened before the pick, the
 cube is still on Table A and the normal Start action is available.
 
 `GANTRY_STEP_PAUSE_S` adds a deliberate pause after every motion or gripper step
 (default `0`; the recorded demo uses `4`). `GANTRY_GRIPPER_SETTLE_S` controls the
 gripper settle delay (default `0.15`).
-
-Each motion state's synchronous `on_enter` callback schedules an async step
-task. The task calls `robot.move_to(...)` repeatedly until the simulator
-reports the target is reached and the axis speed is zero, with a computed
-timeout. This is the requirement's "call `move_to` repeatedly until motion is
-complete" handled inside the state machine callbacks.
 
 ---
 
@@ -268,9 +250,8 @@ All application traffic uses Connect RPC under `/rpc`:
 | `Events` | stream | `Empty` | `Event` |
 
 `SetRobotPosition` is an absolute position move through the same state machine,
-not a teleport. It remains API-only to satisfy the required Get/Set robot
-position surface; the dashboard does not expose manual motion or gripper
-controls. `ResetCube` resets the simulated cube to Table A and requires an open
+It remains API-only to satisfy the required Get/Set robot
+position surface; `ResetCube` resets the simulated cube to Table A and requires an open
 gripper. `StartSequence` is rejected unless the cube is on Table A; it opens a
 closed gripper automatically before moving, because no cube is held in that
 state. `ResumeSequence` is accepted only when the machine is ready and a stopped
@@ -379,24 +360,10 @@ The Vention packages require Python `>=3.10,<3.11`. The project pins
 
 ### Connect RPC, generated client, no polling
 
-`vention-communication` is a Connect-compatible RPC layer, not a REST or
-WebSocket library. The dashboard uses the generated client for every command
+`vention-communication` is a Connect-compatible RPC layer. The dashboard uses the generated client for every command
 and for both streams. Live telemetry is a server stream with `replay=True`, a
 latest-only queue, and a 100 ms/1 s heartbeat. The frontend reconnects with
 backoff and treats 5 s of silence as a stalled stream.
-
-### Fine-grained state machine and a custom `fail` trigger
-
-Each sequence step is a leaf state so the dashboard can show exactly what the
-machine is doing. The pinned `transitions` engine is synchronous, so entry
-callbacks are synchronous and schedule async step tasks. The library's built-in
-`to_fault` transition has an async before-hook that `transitions` never awaits;
-the project uses its own `fail` trigger and cancels tasks explicitly from the
-service instead.
-
-State member names are camelCase because the hierarchical state-name separator
-is `_`; a member named `move_to_pick` would be parsed as nested states and
-crash the machine.
 
 ### Structured command results
 
@@ -413,8 +380,6 @@ The frontend displays both domain rejections and network/timeout errors.
 - Converts the simulator's error string into an exception.
 - `halt()` zeroes the simulator's axis speed so an interrupted move does not
   continue with its old velocity on the next command.
-- Motion loops require both "at target" and "not moving", so the simulator gets
-  the extra call it needs to snap exactly to the target and zero its speed.
 
 ### Persistence
 
@@ -441,16 +406,11 @@ while the robot is moving, and on safe shutdown. On startup:
   restart.
 - `idle` → the machine starts ready, with the persisted gripper state restored.
 
-The app never auto-resumes motion. The run state is a safety record, not a
-durable execution engine. A hard kill (SIGKILL) cannot run cleanup, but the last
+The app never auto-resumes motion.A hard kill (SIGKILL) cannot run cleanup, but the last
 periodic position save and `running` record still restore the robot position and
 force a fault on the next start.
 
-The FastAPI lifespan cancels the telemetry and step tasks, halts the simulator,
-and records `interrupted` if an operation was active. The last known robot
-position is restored on the next process start; motion is never auto-resumed. A
-real machine would need an explicit re-home and hardware safety
-checks.
+
 
 ### One uvicorn worker
 
@@ -459,12 +419,11 @@ process-local. Running multiple workers would create multiple independent
 robots and split the telemetry stream, so the Docker command and documentation
 use exactly one worker.
 
-### Custom dashboard instead of an HMI component library
+### Custom dashboard
 
 The dashboard uses React 19 + Vite + custom CSS and an SVG plan view. This
-keeps the bundle small, avoids React 17 peer constraints from Vention's
-pendant-oriented UI packages, and makes the scene math easy to test. The
-provided figure is a 2D plan view; a 2D SVG is the clearest representation.
+keeps the bundle small and makes the scene math easy to test. The
+provided figure is a 2D plan view;
 
 ### Testing strategy
 
@@ -489,10 +448,7 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
   `unknown`) and drawn at the configured pick point or the live gripper
   position. Its physical dimensions, rotation, and collision volume are not
   simulated.
-- The table geometry is a visual reference. Motion targets come from the
-  configured cube and destination points, not from the table polygons, so the
-  table placement does not affect the control logic. The defaults are the
-  measured table centres.
+
 - The run state is persisted, but motion is never auto-resumed. An interrupted
   operation comes up in `fault` and requires Reset. A real machine additionally
   needs an explicit re-home and hardware safety checks.
@@ -503,9 +459,7 @@ provided figure is a 2D plan view; a 2D SVG is the clearest representation.
   recovery: lift at the current X/Y, move to the place approach, and finish the
   placement. Motion is never auto-resumed, and an interrupted run still starts
   in `fault` and requires Reset before Resume or any other command.
-- The dashboard deliberately has no manual jog or gripper controls. The required
-  `SetRobotPosition` endpoint remains available for API clients, but it is not
-  exposed in the UI.
+
 - One operator, one browser, one backend worker, no authentication.
 - The `SimulateFault` action is a demo aid. It is always in the proto but the
   backend refuses it when `GANTRY_ENABLE_DEV_TOOLS=false`; the frontend hides
