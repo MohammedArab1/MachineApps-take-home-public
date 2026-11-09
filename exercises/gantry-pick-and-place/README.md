@@ -12,7 +12,7 @@ The backend uses:
 - [`vention-state-machine`](https://pypi.org/project/vention-state-machine/) for
   the robot control state machine.
 - [`vention-storage`](https://pypi.org/project/vention-storage/) for persisting
-  the machine configuration in SQLite.
+  the machine configuration and run state in SQLite.
 
 The frontend uses the TypeScript client generated from the proto emitted by
 `vention-communication`.
@@ -31,6 +31,9 @@ and fault recovery.
 
 ## Quick start
 
+All commands below are run from this exercise directory:
+`exercises/gantry-pick-and-place/`.
+
 ### Docker Compose (recommended)
 
 ```bash
@@ -42,7 +45,8 @@ docker compose up --build
 
 The frontend nginx container proxies `/rpc` to the backend with buffering
 disabled so the telemetry stream works through the proxy. The SQLite database
-lives in the `gantry-data` volume, so the configuration survives restarts.
+lives in the `gantry-data` volume, so the configuration and run state survive
+restarts.
 
 ### Local development
 
@@ -101,14 +105,14 @@ make build
   destination, and a vertical Z gauge. The cube follows the gripper while it is
   held.
 - **Controls**: Home, Start/Resume, Stop, and Reset, plus a **Cube** panel with
-  **Reset cube to Table A**. Motion commands are enabled only when the robot is idle and not
-  faulted; Stop remains available while an operation is running, even if the
-  telemetry stream drops. Start is disabled unless the cube is on Table A; if
-  the gripper is closed with no cube held, it opens automatically when the
-  sequence starts. If Stop leaves the cube held, the primary button becomes
-  **Resume sequence** to finish the placement.
+  **Reset cube to Table A**. Motion commands are enabled only when the robot is
+  idle and not faulted; Stop remains available while an operation is running,
+  even if the telemetry stream drops. Start is disabled unless the cube is on
+  Table A; if the gripper is closed with no cube held, it opens automatically
+  when the sequence starts. If Stop leaves the cube held, the primary button
+  becomes **Resume sequence** to finish the placement.
 - **Configuration**: cube start, destination, home, speed, and approach height.
-  Configuration is
+  The form validates locally and the server re-validates; the configuration is
   persisted through `vention-storage`.
 - **Error and connection states**: a red fault banner with Reset, a connection
   banner with automatic stream reconnect, and a dismissible command result
@@ -159,7 +163,9 @@ Validation rules:
 
 ## Sequence
 
-The required sequence is modelled as eight states:
+The required sequence is modelled as eight explicit, observable cycle steps.
+Recovery, homing, and positioning are separate states around the cycle, so Stop,
+Resume, and faults act on a precise point instead of one opaque task.
 
 ```mermaid
 stateDiagram-v2
@@ -225,6 +231,11 @@ cube is still on Table A and the normal Start action is available.
 (default `0`; the recorded demo uses `4`). `GANTRY_GRIPPER_SETTLE_S` controls the
 gripper settle delay (default `0.15`).
 
+Each motion state's `on_enter` callback schedules an async task that calls
+`robot.move_to(...)` repeatedly until the target is reached and the axis speed
+is zero, with a computed timeout. This satisfies the exercise's polling
+requirement without blocking the state machine.
+
 ---
 
 ## API
@@ -249,13 +260,15 @@ All application traffic uses Connect RPC under `/rpc`:
 | `Status` | stream | `Empty` | `StatusSnapshot` |
 | `Events` | stream | `Empty` | `Event` |
 
-`SetRobotPosition` is an absolute position move through the same state machine,
-It remains API-only to satisfy the required Get/Set robot
-position surface; `ResetCube` resets the simulated cube to Table A and requires an open
-gripper. `StartSequence` is rejected unless the cube is on Table A; it opens a
-closed gripper automatically before moving, because no cube is held in that
-state. `ResumeSequence` is accepted only when the machine is ready and a stopped
-cycle left the cube held with the gripper closed; it finishes the place without
+`SetRobotPosition` is an absolute position move through the same state machine.
+It remains API-only to satisfy the required Get/Set robot position surface.
+`GetConfig`/`SetConfig` cover the cube and destination coordinates, and
+`GetRobotPosition`/`SetRobotPosition` cover the robot position.
+`ResetCube` resets the simulated cube to Table A and requires an open gripper.
+`StartSequence` is rejected unless the cube is on Table A; it opens a closed
+gripper automatically before moving, because no cube is held in that state.
+`ResumeSequence` is accepted only when the machine is ready and a stopped cycle
+left the cube held with the gripper closed; it finishes the place without
 re-picking.
 
 Every command returns:
@@ -276,12 +289,12 @@ default response, so command handlers return structured results instead.
 
 The proto is committed at `backend/proto/app.proto`. The backend emits it on
 import; the frontend regenerates `src/gen/` from it before `dev`, `build`,
-`typecheck`, and tests. The CI job regenerates the proto and fails if the
-committed file is stale.
+`typecheck`, and tests. A backend test also checks that the committed proto is
+in sync with the Python surface.
 
 ### Plain HTTP endpoints
 
-- `GET /health` — Docker/CI health check.
+- `GET /health` — Docker health check.
 - The storage library also mounts its CRUD routes under `/config` (writes
   require an `X-User` header). The dashboard uses the Connect RPCs, not these
   routes.
@@ -360,9 +373,10 @@ The Vention packages require Python `>=3.10,<3.11`. The project pins
 
 ### Connect RPC, generated client, no polling
 
-`vention-communication` is a Connect-compatible RPC layer. The dashboard uses the generated client for every command
-and for both streams. Live telemetry is a server stream with `replay=True`, a
-latest-only queue, and a 100 ms/1 s heartbeat. The frontend reconnects with
+`vention-communication` is a Connect-compatible RPC layer. The dashboard uses
+the generated client for every command and for both streams. Live telemetry is a
+server stream with `replay=True`, a latest-only queue, and a 100 ms/1 s
+heartbeat. The frontend reconnects with
 backoff and treats 5 s of silence as a stalled stream.
 
 ### Structured command results
@@ -406,7 +420,7 @@ while the robot is moving, and on safe shutdown. On startup:
   restart.
 - `idle` → the machine starts ready, with the persisted gripper state restored.
 
-The app never auto-resumes motion.A hard kill (SIGKILL) cannot run cleanup, but the last
+The app never auto-resumes motion.mA hard kill (SIGKILL) cannot run cleanup, but the last
 periodic position save and `running` record still restore the robot position and
 force a fault on the next start.
 
@@ -421,9 +435,10 @@ use exactly one worker.
 
 ### Custom dashboard
 
-The dashboard uses React 19 + Vite + custom CSS and an SVG plan view. This
-keeps the bundle small and makes the scene math easy to test. The
-provided figure is a 2D plan view;
+The dashboard uses React 19 + Vite + custom CSS and an SVG plan view. This keeps
+the bundle small and makes the scene math easy to test. The provided figure is a
+2D plan view; a 2D SVG is the clearest representation and avoids a 3D rendering
+dependency.
 
 ### Testing strategy
 
@@ -437,8 +452,6 @@ provided figure is a 2D plan view;
   validation, event merging, every component state, the cube panel, the
   stream hook's reconnect/stall/unmount behavior, and the app's loading/
   connected/fault/disconnected flows. Coverage is ~95.7%.
-- **CI:** GitHub Actions runs backend lint/tests/proto check and frontend
-  lint/typecheck/coverage/build on every push and pull request.
 
 ### Assumptions and limitations
 
@@ -448,7 +461,10 @@ provided figure is a 2D plan view;
   `unknown`) and drawn at the configured pick point or the live gripper
   position. Its physical dimensions, rotation, and collision volume are not
   simulated.
-
+- The table polygons are a visual reference. Motion targets come from the
+  configured cube and destination points, not the table geometry, so changing
+  the drawing does not change the control logic. The defaults are the measured
+  table centres.
 - The run state is persisted, but motion is never auto-resumed. An interrupted
   operation comes up in `fault` and requires Reset. A real machine additionally
   needs an explicit re-home and hardware safety checks.
@@ -459,7 +475,6 @@ provided figure is a 2D plan view;
   recovery: lift at the current X/Y, move to the place approach, and finish the
   placement. Motion is never auto-resumed, and an interrupted run still starts
   in `fault` and requires Reset before Resume or any other command.
-
 - One operator, one browser, one backend worker, no authentication.
 - The `SimulateFault` action is a demo aid. It is always in the proto but the
   backend refuses it when `GANTRY_ENABLE_DEV_TOOLS=false`; the frontend hides
